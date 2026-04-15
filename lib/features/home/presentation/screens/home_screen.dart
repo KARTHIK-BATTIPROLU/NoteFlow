@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../auth/presentation/providers/auth_provider.dart';
 import '../../upload/presentation/screens/upload_screen.dart';
+import 'search_screen.dart';
+import 'downloads_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -15,9 +17,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   int _currentIndex = 0;
 
   final List<Widget> _screens = const [
-    Center(child: Text('Search/Discover Screen - WIP')),
+    SearchScreen(),
     UploadScreen(),
-    Center(child: Text('Downloads Screen - WIP')),
+    DownloadsScreen(),
   ];
 
   @override
