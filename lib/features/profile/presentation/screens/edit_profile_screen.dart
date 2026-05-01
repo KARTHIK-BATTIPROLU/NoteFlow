@@ -330,7 +330,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(
           'Edit Profile',
@@ -413,7 +413,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               color: AppColors.primary,
               shape: BoxShape.circle,
               border: Border.all(
-                color: AppColors.divider,
+                color: Theme.of(context).dividerColor,
                 width: 2,
               ),
             ),
@@ -436,7 +436,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 color: AppColors.primary,
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: AppColors.background,
+                  color: Theme.of(context).scaffoldBackgroundColor,
                   width: 2,
                 ),
               ),
@@ -467,10 +467,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(
-          color: AppColors.divider,
+          color: Theme.of(context).dividerColor,
           width: 1,
         ),
       ),
@@ -519,10 +519,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(
-          color: AppColors.divider,
+          color: Theme.of(context).dividerColor,
           width: 1,
         ),
       ),
@@ -660,10 +660,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: AppColors.error.withOpacity(0.05),
+        color: AppColors.error.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(
-          color: AppColors.error.withOpacity(0.3),
+          color: AppColors.error.withValues(alpha: 0.3),
           width: 1,
         ),
       ),

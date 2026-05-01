@@ -4,8 +4,8 @@ import 'package:intl/intl.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/database/local_db.dart';
 import '../../../../core/services/api_service.dart';
+import '../../../../core/services/theme_service.dart';
 import '../../../../core/utils/toast.dart';
-import '../../../../main.dart'; // Import for themeModeProvider
 import '../../../auth/data/auth_repository.dart';
 import '../../../home/presentation/screens/downloads_screen.dart';
 import 'edit_profile_screen.dart';
@@ -132,13 +132,13 @@ class ProfileScreen extends ConsumerWidget {
     final themeMode = ref.watch(themeModeProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: CustomScrollView(
         slivers: [
           // App Bar
           SliverAppBar(
             floating: true,
-            backgroundColor: AppColors.surface,
+            backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
             elevation: 0,
             title: Text(
               'Profile',
@@ -160,9 +160,10 @@ class ProfileScreen extends ConsumerWidget {
 
                   // Stats Row
                   statsAsync.when(
-                    data: (stats) => _buildStatsRow(stats),
-                    loading: () => _buildStatsRowLoading(),
+                    data: (stats) => _buildStatsRow(context, stats),
+                    loading: () => _buildStatsRowLoading(context),
                     error: (_, __) => _buildStatsRow(
+                      context,
                       UserStats(uploads: 0, downloads: 0, subjects: 0),
                     ),
                   ),
@@ -194,10 +195,10 @@ class ProfileScreen extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.xl),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(
-          color: AppColors.divider,
+          color: Theme.of(context).dividerColor,
           width: 1,
         ),
       ),
@@ -210,16 +211,24 @@ class ProfileScreen extends ConsumerWidget {
             decoration: BoxDecoration(
               color: AppColors.primary,
               shape: BoxShape.circle,
+              image: user?.photoURL != null
+                  ? DecorationImage(
+                      image: NetworkImage(user!.photoURL!),
+                      fit: BoxFit.cover,
+                    )
+                  : null,
             ),
-            child: Center(
-              child: Text(
-                _getInitials(user?.email),
-                style: AppTextStyles.headingLarge.copyWith(
-                  color: Colors.white,
-                  fontSize: 36,
-                ),
-              ),
-            ),
+            child: user?.photoURL == null
+                ? Center(
+                    child: Text(
+                      _getInitials(user?.email),
+                      style: AppTextStyles.headingLarge.copyWith(
+                        color: Colors.white,
+                        fontSize: 36,
+                      ),
+                    ),
+                  )
+                : null,
           ),
 
           const SizedBox(height: AppSpacing.md),
@@ -288,11 +297,12 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildStatsRow(UserStats stats) {
+  Widget _buildStatsRow(BuildContext context, UserStats stats) {
     return Row(
       children: [
         Expanded(
           child: _buildStatCard(
+            context: context,
             icon: Icons.upload_rounded,
             label: 'Uploads',
             value: stats.uploads.toString(),
@@ -302,6 +312,7 @@ class ProfileScreen extends ConsumerWidget {
         const SizedBox(width: AppSpacing.md),
         Expanded(
           child: _buildStatCard(
+            context: context,
             icon: Icons.download_rounded,
             label: 'Downloads',
             value: stats.downloads.toString(),
@@ -311,6 +322,7 @@ class ProfileScreen extends ConsumerWidget {
         const SizedBox(width: AppSpacing.md),
         Expanded(
           child: _buildStatCard(
+            context: context,
             icon: Icons.school_rounded,
             label: 'Subjects',
             value: stats.subjects.toString(),
@@ -321,19 +333,20 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildStatsRowLoading() {
+  Widget _buildStatsRowLoading(BuildContext context) {
     return Row(
       children: [
-        Expanded(child: _buildStatCardSkeleton()),
+        Expanded(child: _buildStatCardSkeleton(context)),
         const SizedBox(width: AppSpacing.md),
-        Expanded(child: _buildStatCardSkeleton()),
+        Expanded(child: _buildStatCardSkeleton(context)),
         const SizedBox(width: AppSpacing.md),
-        Expanded(child: _buildStatCardSkeleton()),
+        Expanded(child: _buildStatCardSkeleton(context)),
       ],
     );
   }
 
   Widget _buildStatCard({
+    required BuildContext context,
     required IconData icon,
     required String label,
     required String value,
@@ -342,10 +355,10 @@ class ProfileScreen extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(
-          color: AppColors.divider,
+          color: Theme.of(context).dividerColor,
           width: 1,
         ),
       ),
@@ -382,14 +395,14 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildStatCardSkeleton() {
+  Widget _buildStatCardSkeleton(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(
-          color: AppColors.divider,
+          color: Theme.of(context).dividerColor,
           width: 1,
         ),
       ),
@@ -399,7 +412,7 @@ class ProfileScreen extends ConsumerWidget {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: AppColors.divider,
+              color: Theme.of(context).dividerColor,
               borderRadius: BorderRadius.circular(AppRadius.sm),
             ),
           ),
@@ -408,7 +421,7 @@ class ProfileScreen extends ConsumerWidget {
             width: 30,
             height: 24,
             decoration: BoxDecoration(
-              color: AppColors.divider,
+              color: Theme.of(context).dividerColor,
               borderRadius: BorderRadius.circular(4),
             ),
           ),
@@ -417,7 +430,7 @@ class ProfileScreen extends ConsumerWidget {
             width: 50,
             height: 12,
             decoration: BoxDecoration(
-              color: AppColors.divider,
+              color: Theme.of(context).dividerColor,
               borderRadius: BorderRadius.circular(4),
             ),
           ),
@@ -433,10 +446,10 @@ class ProfileScreen extends ConsumerWidget {
   ) {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(
-          color: AppColors.divider,
+          color: Theme.of(context).dividerColor,
           width: 1,
         ),
       ),
@@ -463,20 +476,140 @@ class ProfileScreen extends ConsumerWidget {
             leading: Icon(
               themeMode == ThemeMode.dark
                   ? Icons.dark_mode_rounded
-                  : Icons.light_mode_rounded,
+                  : themeMode == ThemeMode.light
+                      ? Icons.light_mode_rounded
+                      : Icons.brightness_auto_rounded,
               color: AppColors.primary,
             ),
             title: Text(
-              'Dark Mode',
+              'Theme',
               style: AppTextStyles.bodyLarge,
             ),
-            trailing: Switch(
-              value: themeMode == ThemeMode.dark,
-              onChanged: (value) {
-                ref.read(themeModeProvider.notifier).state =
-                    value ? ThemeMode.dark : ThemeMode.light;
+            subtitle: Text(
+              themeMode == ThemeMode.dark
+                  ? 'Dark'
+                  : themeMode == ThemeMode.light
+                      ? 'Light'
+                      : 'System',
+              style: AppTextStyles.bodySmall.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+            trailing: PopupMenuButton<ThemeMode>(
+              icon: Icon(
+                Icons.more_vert,
+                color: AppColors.textSecondary,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppRadius.md),
+              ),
+              onSelected: (ThemeMode mode) {
+                ref.read(themeModeProvider.notifier).setThemeMode(mode);
               },
-              activeColor: AppColors.primary,
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: ThemeMode.light,
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.light_mode_rounded,
+                        color: themeMode == ThemeMode.light
+                            ? AppColors.primary
+                            : AppColors.textSecondary,
+                        size: 20,
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Text(
+                        'Light',
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          color: themeMode == ThemeMode.light
+                              ? AppColors.primary
+                              : AppColors.textPrimary,
+                          fontWeight: themeMode == ThemeMode.light
+                              ? FontWeight.w600
+                              : FontWeight.normal,
+                        ),
+                      ),
+                      if (themeMode == ThemeMode.light) ...[
+                        const Spacer(),
+                        Icon(
+                          Icons.check,
+                          color: AppColors.primary,
+                          size: 20,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: ThemeMode.dark,
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.dark_mode_rounded,
+                        color: themeMode == ThemeMode.dark
+                            ? AppColors.primary
+                            : AppColors.textSecondary,
+                        size: 20,
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Text(
+                        'Dark',
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          color: themeMode == ThemeMode.dark
+                              ? AppColors.primary
+                              : AppColors.textPrimary,
+                          fontWeight: themeMode == ThemeMode.dark
+                              ? FontWeight.w600
+                              : FontWeight.normal,
+                        ),
+                      ),
+                      if (themeMode == ThemeMode.dark) ...[
+                        const Spacer(),
+                        Icon(
+                          Icons.check,
+                          color: AppColors.primary,
+                          size: 20,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: ThemeMode.system,
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.brightness_auto_rounded,
+                        color: themeMode == ThemeMode.system
+                            ? AppColors.primary
+                            : AppColors.textSecondary,
+                        size: 20,
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Text(
+                        'System',
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          color: themeMode == ThemeMode.system
+                              ? AppColors.primary
+                              : AppColors.textPrimary,
+                          fontWeight: themeMode == ThemeMode.system
+                              ? FontWeight.w600
+                              : FontWeight.normal,
+                        ),
+                      ),
+                      if (themeMode == ThemeMode.system) ...[
+                        const Spacer(),
+                        Icon(
+                          Icons.check,
+                          color: AppColors.primary,
+                          size: 20,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -487,10 +620,10 @@ class ProfileScreen extends ConsumerWidget {
   Widget _buildAboutSection(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(
-          color: AppColors.divider,
+          color: Theme.of(context).dividerColor,
           width: 1,
         ),
       ),
@@ -534,7 +667,7 @@ class ProfileScreen extends ConsumerWidget {
               );
             },
           ),
-          Divider(height: 1, color: AppColors.divider, indent: 56),
+          Divider(height: 1, color: Theme.of(context).dividerColor, indent: 56),
           ListTile(
             leading: Icon(
               Icons.info_outline,
@@ -551,7 +684,7 @@ class ProfileScreen extends ConsumerWidget {
               ),
             ),
           ),
-          Divider(height: 1, color: AppColors.divider, indent: 56),
+          Divider(height: 1, color: Theme.of(context).dividerColor, indent: 56),
           ListTile(
             leading: Icon(
               Icons.share_rounded,
@@ -567,7 +700,7 @@ class ProfileScreen extends ConsumerWidget {
             ),
             onTap: () => _showComingSoonSnackBar(context, 'Share app'),
           ),
-          Divider(height: 1, color: AppColors.divider, indent: 56),
+          Divider(height: 1, color: Theme.of(context).dividerColor, indent: 56),
           ListTile(
             leading: Icon(
               Icons.star_outline,
@@ -591,10 +724,10 @@ class ProfileScreen extends ConsumerWidget {
   Widget _buildAccountSection(BuildContext context, WidgetRef ref) {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(
-          color: AppColors.divider,
+          color: Theme.of(context).dividerColor,
           width: 1,
         ),
       ),
@@ -639,3 +772,5 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 }
+
+
