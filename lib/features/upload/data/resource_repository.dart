@@ -13,23 +13,25 @@ class ResourceRepository {
 
   ResourceRepository(this._apiService);
 
-  Future<Resource> createResource({
+  Future<Resource> uploadResource({
+    required dynamic bytes,
+    required String fileName,
     required String title,
     required String subject,
     required String topic,
-    required String fileUrl,
-    required String fileType,
-    required String uploadedBy,
+    required String firebaseUid,
+    required String firebaseToken,
+    void Function(double progress)? onProgress,
   }) async {
-    final resourceData = {
-      'title': title,
-      'subject': subject,
-      'topic': topic,
-      'file_url': fileUrl,
-      'file_type': fileType,
-      'uploaded_by': uploadedBy,
-    };
-
-    return await _apiService.createResource(resourceData);
+    return await _apiService.uploadResource(
+      bytes: bytes,
+      fileName: fileName,
+      title: title,
+      subject: subject,
+      topic: topic,
+      firebaseUid: firebaseUid,
+      firebaseToken: firebaseToken,
+      onProgress: onProgress,
+    );
   }
 }
