@@ -58,14 +58,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     final subjectsAsync = ref.watch(subjectsProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
             // Search Bar
             Container(
               padding: const EdgeInsets.all(AppSpacing.lg),
-              color: AppColors.surface,
+              color: Theme.of(context).appBarTheme.backgroundColor,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

@@ -39,4 +39,8 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
       state = AsyncError(e, st);
     }
   }
+
+  Future<String?> getIdToken() async {
+    return await _authRepository.getIdToken();
+  }
 }

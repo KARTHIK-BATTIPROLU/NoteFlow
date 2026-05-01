@@ -1,8 +1,24 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/services/storage_service.dart';
 import '../../../../features/auth/data/auth_repository.dart';
 import '../../data/resource_repository.dart';
+
+// File picker service provider
+final filePickerServiceProvider = Provider<FilePickerService>((ref) {
+  return FilePickerService();
+});
+
+class FilePickerService {
+  Future<PlatformFile?> pickFile({List<String>? allowedExtensions}) async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: allowedExtensions ?? ['pdf', 'ppt', 'pptx'],
+      withData: true,
+    );
+
+    return result?.files.isNotEmpty == true ? result!.files.first : null;
+  }
+}
 
 class UploadState {
   final PlatformFile? selectedFile;

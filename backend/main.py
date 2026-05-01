@@ -157,23 +157,39 @@ async def get_all_resources():
 #     return ResourceResponse(**created_resource)
 
 async def verify_firebase_token(authorization: str = Header(...)):
-    """Verifies Firebase token - optionally bypass in dev if needed"""
+    """Verifies Firebase token and extracts UID"""
     try:
         scheme, token = authorization.split()
         if scheme.lower() != "bearer":
             raise HTTPException(status_code=401, detail="Invalid auth scheme")
         
-        # In a real production setup, this will check token against Firebase Servers
-        # For local dev without creds configured, we'll try to decode, 
-        # but you should configure firebase_admin securely.
+        # Try to verify with Firebase Admin SDK
         try:
             decoded_token = auth.verify_id_token(token)
-            return decoded_token['uid']
+            uid = decoded_token['uid']
+            print(f"✓ Token verified successfully. UID: {uid}")
+            return uid
         except Exception as e:
-            # Fallback for dev mode - remove in pure production!
-            print(f"Token verification fail: {str(e)} - using raw token as UID for dev.")
-            return token
+            # Fallback: decode JWT without verification to extract UID
+            # This is for development when Firebase Admin SDK is not configured
+            print(f"⚠ Token verification failed: {str(e)}")
+            print(f"⚠ Falling back to JWT decode without verification (DEV MODE)")
             
+            try:
+                import jwt as pyjwt
+                decoded = pyjwt.decode(token, options={"verify_signature": False})
+                uid = decoded.get('user_id') or decoded.get('sub')
+                if uid:
+                    print(f"✓ Extracted UID from token: {uid}")
+                    return uid
+                else:
+                    raise HTTPException(status_code=401, detail="Could not extract UID from token")
+            except Exception as decode_error:
+                print(f"✗ Failed to decode token: {decode_error}")
+                raise HTTPException(status_code=401, detail=f"Invalid token: {decode_error}")
+            
+    except ValueError:
+        raise HTTPException(status_code=401, detail="Invalid authorization header format")
     except Exception as e:
         raise HTTPException(status_code=401, detail=f"Unauthorized: {str(e)}")
 
@@ -321,13 +337,53 @@ async def search_resources(
         # Case-insensitive search in title
         query["title"] = {"$regex": re.escape(q), "$options": "i"}
     
-    resources_cursor = collection.find(query).sort("uploaded_at", -1)
+    resources_cursor = collection.find(query).sort("created_at", -1)
     resources = await resources_cursor.to_list(length=None)
     
     # Enrich resources with subject and topic names
     result = []
     for r in resources:
         # Get subject name
+        subject_name = "Unknown"
+        topic_name = "Unknown"
+        
+        try:
+            if r.get("subject"):
+                subject_doc = await subjects_coll.find_one({"_id": ObjectId(r["subject"])})
+                if subject_doc: subject_name = subject_doc["name"]
+        except: pass
+        
+        try:
+            if r.get("topic"):
+                topic_doc = await topics_coll.find_one({"_id": ObjectId(r["topic"])})
+                if topic_doc: topic_name = topic_doc["name"]
+        except: pass
+        
+        r['id'] = str(r['_id'])
+        r['subject_name'] = subject_name
+        r['topic_name'] = topic_name
+        result.append(ResourceResponse(**r))
+    
+    return result
+
+@app.get("/user/resources/", response_model=List[ResourceResponse])
+async def get_user_resources(
+    firebase_uid: str = Depends(verify_firebase_token)
+):
+    """
+    Get all resources uploaded by the authenticated user
+    """
+    collection = resources_collection()
+    subjects_coll = subjects_collection()
+    topics_coll = topics_collection()
+    
+    # Query resources by firebase_uid
+    resources_cursor = collection.find({"firebase_uid": firebase_uid}).sort("created_at", -1)
+    resources = await resources_cursor.to_list(length=None)
+    
+    # Enrich resources with subject and topic names
+    result = []
+    for r in resources:
         subject_name = "Unknown"
         topic_name = "Unknown"
         

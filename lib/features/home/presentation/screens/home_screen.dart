@@ -26,7 +26,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: IndexedStack(
         index: _currentIndex,
         children: const [
@@ -40,7 +40,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         decoration: BoxDecoration(
           border: Border(
             top: BorderSide(
-              color: AppColors.divider,
+              color: Theme.of(context).dividerColor,
               width: 1,
             ),
           ),
@@ -50,7 +50,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           onTap: (index) {
             // Refresh Explore tab when returning from Upload tab
             if (_previousIndex == 2 && index == 0) {
-              ref.invalidate(allResourcesProvider);
+              ref.invalidate(userResourcesProvider); // Changed from allResourcesProvider
             }
             setState(() {
               _previousIndex = _currentIndex;
@@ -101,7 +101,7 @@ class _ExploreTabState extends ConsumerState<_ExploreTab> {
   String? _selectedSubjectId;
 
   Future<void> _refresh() async {
-    ref.invalidate(allResourcesProvider);
+    ref.invalidate(userResourcesProvider); // Changed from allResourcesProvider
     ref.invalidate(subjectsProvider);
   }
 
@@ -123,7 +123,7 @@ class _ExploreTabState extends ConsumerState<_ExploreTab> {
 
   @override
   Widget build(BuildContext context) {
-    final resourcesAsync = ref.watch(allResourcesProvider);
+    final resourcesAsync = ref.watch(userResourcesProvider); // Changed to userResourcesProvider
     final subjectsAsync = ref.watch(subjectsProvider);
 
     return RefreshIndicator(
@@ -134,7 +134,7 @@ class _ExploreTabState extends ConsumerState<_ExploreTab> {
           // App Bar
           SliverAppBar(
             floating: true,
-            backgroundColor: AppColors.surface,
+            backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
             elevation: 0,
             title: Row(
               children: [
@@ -263,7 +263,7 @@ class _ExploreTabState extends ConsumerState<_ExploreTab> {
             ),
           ),
 
-          // Recent Uploads Title
+          // My Uploads Title
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(
@@ -273,7 +273,7 @@ class _ExploreTabState extends ConsumerState<_ExploreTab> {
                 AppSpacing.md,
               ),
               child: Text(
-                'Recent uploads',
+                'My uploads', // Changed from 'Recent uploads'
                 style: AppTextStyles.headingMedium,
               ),
             ),
@@ -302,6 +302,13 @@ class _ExploreTabState extends ConsumerState<_ExploreTab> {
                         Text(
                           'No resources found',
                           style: AppTextStyles.bodyLarge.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        Text(
+                          'Upload your first resource!',
+                          style: AppTextStyles.bodySmall.copyWith(
                             color: AppColors.textSecondary,
                           ),
                         ),

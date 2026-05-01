@@ -84,28 +84,27 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // NoteFlow Logo
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.menu_book_rounded,
-                    size: 48,
-                    color: AppColors.primary,
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  Text(
-                    'NoteFlow',
-                    style: AppTextStyles.headingLarge.copyWith(
-                      fontSize: 48,
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
+              // NoteFlow Logo Image
+              Image.asset(
+                'assets/images/logo.png',
+                width: 200,
+                height: 200,
+                fit: BoxFit.contain,
               ),
               
-              const SizedBox(height: AppSpacing.lg),
+              const SizedBox(height: AppSpacing.xl),
+              
+              // App Name
+              Text(
+                'NoteFlow',
+                style: AppTextStyles.headingLarge.copyWith(
+                  fontSize: 42,
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              
+              const SizedBox(height: AppSpacing.md),
               
               // Tagline
               Text(

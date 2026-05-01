@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/database/local_db.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
+import 'core/services/theme_service.dart';
 import 'firebase_options.dart';
 
 void main() async {
@@ -36,9 +37,6 @@ class MyApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(goRouterProvider);
-    
-    // Import the theme mode provider from profile screen
-    // For now, we'll use a local provider that can be accessed globally
     final themeMode = ref.watch(themeModeProvider);
 
     return MaterialApp.router(
@@ -51,6 +49,3 @@ class MyApp extends ConsumerWidget {
     );
   }
 }
-
-// Global theme mode provider
-final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.system);

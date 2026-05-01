@@ -131,7 +131,7 @@ Before testing upload:
 
 Once uploads are working, you can secure the rules:
 
-### Secure Storage Rules:
+### Secure Storage Rules (with Profile Pictures):
 ```javascript
 rules_version = '2';
 service firebase.storage {
@@ -141,8 +141,13 @@ service firebase.storage {
       allow read: if true;
     }
     
-    // Only authenticated users can upload to their folder
+    // Only authenticated users can upload to their resource folder
     match /resources/{userId}/{fileName} {
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Only authenticated users can upload their own profile picture
+    match /profile_pictures/{userId}/{fileName} {
       allow write: if request.auth != null && request.auth.uid == userId;
     }
   }

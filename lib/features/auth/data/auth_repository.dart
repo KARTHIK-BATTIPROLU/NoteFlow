@@ -43,4 +43,15 @@ class AuthRepository {
   Future<void> signOut() async {
     await _auth.signOut();
   }
+
+  Future<String?> getIdToken() async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return null;
+      return await user.getIdToken();
+    } catch (e) {
+      print('Error getting ID token: $e');
+      return null;
+    }
+  }
 }
