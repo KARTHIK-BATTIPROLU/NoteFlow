@@ -7,14 +7,19 @@ class ResourceCreate(BaseModel):
     title: str
     subject: str
     topic: str
-    file_url: str
-    file_type: str
-    uploaded_by: str
-
+    firebase_uid: str
+    file_id: str
+    file_name: str
+    content_type: str
+    size: int
+    likes: int = 0
+    downloads: int = 0
+    created_at: datetime = None
 
 class ResourceResponse(ResourceCreate):
     id: str
-    uploaded_at: datetime
+    subject_name: Optional[str] = None
+    topic_name: Optional[str] = None
 
 
 class SubjectCreate(BaseModel):

@@ -18,3 +18,13 @@ final resourcesProvider = FutureProvider.family<List<Resource>, String>((ref, to
   final apiService = ref.watch(apiServiceProvider);
   return apiService.getResources(topicId);
 });
+
+final allResourcesProvider = FutureProvider<List<Resource>>((ref) async {
+  final apiService = ref.watch(apiServiceProvider);
+  return apiService.getAllResources();
+});
+
+final searchResourcesProvider = FutureProvider.family<List<Resource>, String>((ref, query) async {
+  final apiService = ref.watch(apiServiceProvider);
+  return apiService.searchResources(query: query);
+});

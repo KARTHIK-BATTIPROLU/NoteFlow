@@ -1,9 +1,8 @@
-import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/services/storage_service.dart';
-import '../../data/resource_repository.dart';
 import '../../../../features/auth/data/auth_repository.dart';
+import '../../data/resource_repository.dart';
 
 class UploadState {
   final PlatformFile? selectedFile;
@@ -64,7 +63,28 @@ class UploadNotifier extends StateNotifier<UploadState> {
       allowedExtensions: ['pdf', 'ppt', 'pptx'],
     );
     if (file != null) {
-      state = state.copyWith(selectedFile: file);
+      // Check file size (200MB = 200 * 1024 * 1024 bytes)
+      const maxSizeBytes = 200 * 1024 * 1024;
+      const warningSizeBytes = 50 * 1024 * 1024;
+      
+      if (file.size > maxSizeBytes) {
+        state = state.copyWith(
+          error: 'File size exceeds 200MB limit. Please select a smaller file.',
+        );
+        return;
+      }
+      
+      // Set warning for large files (50MB+)
+      String? warning;
+      if (file.size > warningSizeBytes) {
+        final sizeMB = (file.size / (1024 * 1024)).toStringAsFixed(1);
+        warning = 'Large file ($sizeMB MB) - upload may take time on mobile data';
+      }
+      
+      state = state.copyWith(
+        selectedFile: file,
+        error: warning, // Use error field to show warning
+      );
     }
   }
 
@@ -95,30 +115,29 @@ class UploadNotifier extends StateNotifier<UploadState> {
     state = state.copyWith(isUploading: true, error: null, uploadProgress: 0);
 
     try {
-      final storage = _ref.read(storageServiceProvider);
       final repository = _ref.read(resourceRepositoryProvider);
 
-      final file = File(state.selectedFile!.path!);
+      final bytes = state.selectedFile!.bytes;
+      if (bytes == null) {
+        throw Exception('File bytes not available');
+      }
       final fileName =
           '${DateTime.now().millisecondsSinceEpoch}_${state.selectedFile!.name}';
-      final fileType = state.selectedFile!.extension ?? 'pdf';
+      
+      final token = await user.getIdToken();
+      if (token == null) throw Exception('Unable to get authentication token');
 
-      final fileUrl = await storage.uploadFile(
-        file: file,
+      await repository.uploadResource(
+        bytes: bytes,
         fileName: fileName,
-        userId: user.uid,
-        onProgress: (progress) {
-          state = state.copyWith(uploadProgress: progress);
-        },
-      );
-
-      await repository.createResource(
         title: state.title,
         subject: state.subject,
         topic: state.topic,
-        fileUrl: fileUrl,
-        fileType: fileType,
-        uploadedBy: user.uid,
+        firebaseUid: user.uid,
+        firebaseToken: token,
+        onProgress: (progress) {
+          state = state.copyWith(uploadProgress: progress);
+        },
       );
 
       state = state.copyWith(isUploading: false, isSuccess: true);

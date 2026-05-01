@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/database/local_db.dart';
 import 'core/router/app_router.dart';
+import 'core/theme/app_theme.dart';
 import 'firebase_options.dart';
 
 void main() async {
@@ -35,14 +36,21 @@ class MyApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(goRouterProvider);
+    
+    // Import the theme mode provider from profile screen
+    // For now, we'll use a local provider that can be accessed globally
+    final themeMode = ref.watch(themeModeProvider);
 
     return MaterialApp.router(
-      title: 'NoteFlow Auth App',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
-        useMaterial3: true,
-      ),
+      title: 'NoteFlow',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: themeMode,
       routerConfig: router,
     );
   }
 }
+
+// Global theme mode provider
+final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.system);
