@@ -9,10 +9,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-MONGODB_URL = os.getenv(
-    "MONGODB_URL",
-    "REMOVED_MONGODB_CREDENTIAL",
-)
+MONGODB_URL = os.getenv("MONGODB_URL")
+if not MONGODB_URL:
+    raise RuntimeError(
+        "MONGODB_URL environment variable is not set. "
+        "Set it in backend/.env or your shell environment before running this script."
+    )
+
 DATABASE_NAME = "noteflow"
 
 def extract_uid_from_jwt(token):

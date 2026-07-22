@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI, HTTPException, Depends, Query, UploadFile, File, Form, Header
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,11 +13,20 @@ from firebase_admin import credentials, auth
 from database import connect_to_mongo, close_mongo_connection, subjects as subjects_collection, topics as topics_collection, resources as resources_collection, get_database, get_gridfs
 from models import SubjectResponse, SubjectCreate, TopicResponse, TopicCreate, ResourceResponse, ResourceCreate
 
-# Initialize Firebase Admin (modify with your service account path if needed)
+# Initialize Firebase Admin SDK
+# On Render: add a secret file at /etc/secrets/serviceAccount.json and set
+# FIREBASE_SERVICE_ACCOUNT=/etc/secrets/serviceAccount.json as an env var.
+_sa_path = os.environ.get("FIREBASE_SERVICE_ACCOUNT")
 try:
-    firebase_admin.initialize_app()
+    if _sa_path:
+        _creds = credentials.Certificate(_sa_path)
+        firebase_admin.initialize_app(_creds)
+        print(f"[auth] Firebase initialized with service account: {_sa_path}")
+    else:
+        firebase_admin.initialize_app()
+        print("[auth] Firebase initialized without explicit credentials (using GOOGLE_APPLICATION_CREDENTIALS or metadata server).")
 except ValueError:
-    pass # Already initialized
+    pass  # Already initialized
 
 app = FastAPI(title="NoteFlow API", version="1.0.0")
 
@@ -157,41 +167,32 @@ async def get_all_resources():
 #     return ResourceResponse(**created_resource)
 
 async def verify_firebase_token(authorization: str = Header(...)):
-    """Verifies Firebase token and extracts UID"""
+    """Verify a Firebase ID token and return the uid.
+
+    Raises HTTP 401 for any invalid or unverifiable token.
+    No insecure fallback — token signature is always checked.
+    """
     try:
-        scheme, token = authorization.split()
-        if scheme.lower() != "bearer":
-            raise HTTPException(status_code=401, detail="Invalid auth scheme")
-        
-        # Try to verify with Firebase Admin SDK
+        parts = authorization.split()
+        if len(parts) != 2 or parts[0].lower() != "bearer":
+            raise HTTPException(status_code=401, detail="Invalid authorization header format")
+        token = parts[1]
+
         try:
             decoded_token = auth.verify_id_token(token)
-            uid = decoded_token['uid']
-            print(f"✓ Token verified successfully. UID: {uid}")
+            uid = decoded_token["uid"]
             return uid
+        except auth.ExpiredIdTokenError:
+            raise HTTPException(status_code=401, detail="Token has expired")
+        except auth.InvalidIdTokenError as e:
+            raise HTTPException(status_code=401, detail=f"Invalid token: {e}")
         except Exception as e:
-            # Fallback: decode JWT without verification to extract UID
-            # This is for development when Firebase Admin SDK is not configured
-            print(f"⚠ Token verification failed: {str(e)}")
-            print(f"⚠ Falling back to JWT decode without verification (DEV MODE)")
-            
-            try:
-                import jwt as pyjwt
-                decoded = pyjwt.decode(token, options={"verify_signature": False})
-                uid = decoded.get('user_id') or decoded.get('sub')
-                if uid:
-                    print(f"✓ Extracted UID from token: {uid}")
-                    return uid
-                else:
-                    raise HTTPException(status_code=401, detail="Could not extract UID from token")
-            except Exception as decode_error:
-                print(f"✗ Failed to decode token: {decode_error}")
-                raise HTTPException(status_code=401, detail=f"Invalid token: {decode_error}")
-            
-    except ValueError:
-        raise HTTPException(status_code=401, detail="Invalid authorization header format")
+            raise HTTPException(status_code=401, detail=f"Token verification failed: {e}")
+
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=401, detail=f"Unauthorized: {str(e)}")
+        raise HTTPException(status_code=401, detail=f"Unauthorized: {e}")
 
 @app.post("/upload", response_model=ResourceResponse)
 async def upload_resource(

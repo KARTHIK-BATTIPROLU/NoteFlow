@@ -5,10 +5,12 @@ from typing import Optional
 from dotenv import load_dotenv
 load_dotenv()
 
-MONGODB_URL = os.getenv(
-    "MONGODB_URL",
-    "REMOVED_MONGODB_CREDENTIAL",
-)
+MONGODB_URL = os.getenv("MONGODB_URL")
+if not MONGODB_URL:
+    raise RuntimeError(
+        "MONGODB_URL environment variable is not set. "
+        "Set it in backend/.env or your shell environment before starting the server."
+    )
 DATABASE_NAME = "noteflow"
 
 client: Optional[AsyncIOMotorClient] = None
