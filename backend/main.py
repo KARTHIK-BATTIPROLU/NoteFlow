@@ -34,8 +34,11 @@ try:
     else:
         firebase_admin.initialize_app()
         print("[auth] Firebase initialized without explicit credentials (using GOOGLE_APPLICATION_CREDENTIALS or metadata server).")
-except ValueError:
-    pass  # Already initialized
+except ValueError as e:
+    if firebase_admin._apps:
+        pass  # Already initialized (e.g. reload) -- not an error
+    else:
+        raise RuntimeError(f"Firebase Admin initialization failed: {e}") from e
 
 app = FastAPI(title="NoteFlow API", version="1.0.0")
 
