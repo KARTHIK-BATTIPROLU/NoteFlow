@@ -1,4 +1,5 @@
 import os
+import json
 from fastapi import FastAPI, HTTPException, Depends, Query, UploadFile, File, Form, Header
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,15 +14,23 @@ from firebase_admin import credentials, auth
 from database import connect_to_mongo, close_mongo_connection, subjects as subjects_collection, topics as topics_collection, resources as resources_collection, get_database, get_gridfs
 from models import SubjectResponse, SubjectCreate, TopicResponse, TopicCreate, ResourceResponse, ResourceCreate
 
-# Initialize Firebase Admin SDK
-# On Render: add a secret file at /etc/secrets/serviceAccount.json and set
-# FIREBASE_SERVICE_ACCOUNT=/etc/secrets/serviceAccount.json as an env var.
+# Initialize Firebase Admin SDK.
+# Preferred: set FIREBASE_SERVICE_ACCOUNT_JSON to the full contents of the
+# Firebase service-account JSON key (Firebase Console -> Project Settings ->
+# Service Accounts -> Generate new private key). This is a plain env var, so
+# it doesn't depend on a secret file landing at an exact mounted path.
+# Fallback: FIREBASE_SERVICE_ACCOUNT can point to a JSON file on disk instead.
+_sa_json = os.environ.get("FIREBASE_SERVICE_ACCOUNT_JSON")
 _sa_path = os.environ.get("FIREBASE_SERVICE_ACCOUNT")
 try:
-    if _sa_path:
+    if _sa_json:
+        _creds = credentials.Certificate(json.loads(_sa_json))
+        firebase_admin.initialize_app(_creds)
+        print("[auth] Firebase initialized with service account from FIREBASE_SERVICE_ACCOUNT_JSON")
+    elif _sa_path:
         _creds = credentials.Certificate(_sa_path)
         firebase_admin.initialize_app(_creds)
-        print(f"[auth] Firebase initialized with service account: {_sa_path}")
+        print(f"[auth] Firebase initialized with service account file: {_sa_path}")
     else:
         firebase_admin.initialize_app()
         print("[auth] Firebase initialized without explicit credentials (using GOOGLE_APPLICATION_CREDENTIALS or metadata server).")
