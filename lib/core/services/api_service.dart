@@ -13,13 +13,7 @@ class ApiService {
   final String baseUrl = getBaseUrl();
 
   static String getBaseUrl() {
-    try {
-      if (Platform.isAndroid) {
-        // Using computer's IP address for physical device
-        return 'http://10.161.157.42:8000';
-      }
-    } catch (_) {}
-    return 'http://localhost:8000';
+    return 'https://noteflow-uxwh.onrender.com';
   }
   
   static String getFileDownloadUrl(String fileId) {
