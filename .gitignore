@@ -45,3 +45,6 @@ app.*.map.json
 /android/app/release
 serviceAccount.json
 *.json
+
+# Environment variables (contains secrets)
+.env

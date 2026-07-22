@@ -1,6 +1,17 @@
+import os
 from pymongo import MongoClient
 
-client = MongoClient('mongodb://localhost:27017/')
+from dotenv import load_dotenv
+load_dotenv()
+
+MONGODB_URL = os.getenv("MONGODB_URL")
+if not MONGODB_URL:
+    raise RuntimeError(
+        "MONGODB_URL environment variable is not set. "
+        "Set it in backend/.env or your shell environment before running this script."
+    )
+
+client = MongoClient(MONGODB_URL)
 db = client['noteflow']
 
 print("=" * 50)
