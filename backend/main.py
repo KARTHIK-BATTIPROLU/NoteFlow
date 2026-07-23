@@ -40,6 +40,14 @@ except ValueError as e:
     else:
         raise RuntimeError(f"Firebase Admin initialization failed: {e}") from e
 
+if not firebase_admin.get_app().project_id:
+    raise RuntimeError(
+        "Firebase Admin has no project ID -- neither FIREBASE_SERVICE_ACCOUNT_JSON nor "
+        "FIREBASE_SERVICE_ACCOUNT is set in this environment, so it fell back to ambient "
+        "GCP credentials, which don't exist on Render. Set FIREBASE_SERVICE_ACCOUNT_JSON to "
+        "the full contents of a Firebase service-account key."
+    )
+
 app = FastAPI(title="NoteFlow API", version="1.0.0")
 
 # CORS middleware for allowing frontend to talk to the backend
