@@ -48,3 +48,8 @@ serviceAccount.json
 
 # Environment variables (contains secrets)
 .env
+
+# Python virtual environments
+.venv/
+.venv*/
+venv/
