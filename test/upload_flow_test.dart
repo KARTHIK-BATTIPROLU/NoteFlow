@@ -155,7 +155,7 @@ void main() {
       var isUploading = false;
       var uploadProgress = 0.0;
       var isSuccess = false;
-      var error = null;
+      String? error;
 
       expect(isUploading, isFalse);
       expect(uploadProgress, equals(0.0));

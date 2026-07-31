@@ -31,14 +31,14 @@ class SubjectChip extends StatelessWidget {
     switch (type) {
       case ChipType.subject:
         backgroundColor = isDark 
-            ? AppColors.chipSubject.withOpacity(0.2)
+            ? AppColors.chipSubject.withValues(alpha: 0.2)
             : AppColors.chipSubjectBg;
         textColor = AppColors.chipSubject;
         icon = Icons.book_outlined;
         break;
       case ChipType.topic:
         backgroundColor = isDark
-            ? AppColors.chipTopic.withOpacity(0.2)
+            ? AppColors.chipTopic.withValues(alpha: 0.2)
             : AppColors.chipTopicBg;
         textColor = AppColors.chipTopic;
         icon = Icons.label_outline;

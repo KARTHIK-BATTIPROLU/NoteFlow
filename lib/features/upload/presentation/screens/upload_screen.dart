@@ -164,11 +164,11 @@ class _UploadScreenState extends ConsumerState<UploadScreen> with SingleTickerPr
         padding: const EdgeInsets.all(AppSpacing.xl),
         decoration: BoxDecoration(
           color: hasFile 
-              ? AppColors.primary.withOpacity(0.05)
+              ? AppColors.primary.withValues(alpha: 0.05)
               : AppColors.surface,
           borderRadius: BorderRadius.circular(AppRadius.lg),
           border: Border.all(
-            color: AppColors.primary.withOpacity(0.4),
+            color: AppColors.primary.withValues(alpha: 0.4),
             width: 2,
             strokeAlign: BorderSide.strokeAlignInside,
           ),
@@ -215,7 +215,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> with SingleTickerPr
         Container(
           padding: const EdgeInsets.all(AppSpacing.md),
           decoration: BoxDecoration(
-            color: _getFileIconColor(file.name).withOpacity(0.1),
+            color: _getFileIconColor(file.name).withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(AppRadius.md),
           ),
           child: Icon(
@@ -440,7 +440,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> with SingleTickerPr
           backgroundColor: isSuccess ? AppColors.success : AppColors.primary,
           disabledBackgroundColor: isSuccess 
               ? AppColors.success 
-              : AppColors.primary.withOpacity(0.6),
+              : AppColors.primary.withValues(alpha: 0.6),
         ),
         child: isUploading
             ? Stack(
@@ -448,7 +448,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> with SingleTickerPr
                 children: [
                   LinearProgressIndicator(
                     value: state.uploadProgress,
-                    backgroundColor: Colors.white.withOpacity(0.3),
+                    backgroundColor: Colors.white.withValues(alpha: 0.3),
                     valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
                   ),
                   Text(

@@ -81,8 +81,8 @@ void main() {
       
       expect(id, equals('res789'));
       expect(title, equals('Minimal Resource'));
-      expect(subjectId, equals(''));
-      expect(topicId, equals(''));
+      expect(subjectId, equals('physics'));
+      expect(topicId, equals('phy_mechanics'));
       expect(firebaseUid, equals(''));
       expect(fileId, equals(''));
       expect(fileName, equals('unknown'));

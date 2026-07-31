@@ -27,7 +27,7 @@ class EmptyState extends StatelessWidget {
             CustomPaint(
               size: const Size(200, 200),
               painter: _EmptyStatePainter(
-                color: AppColors.primary.withOpacity(0.1),
+                color: AppColors.primary.withValues(alpha: 0.1),
                 accentColor: AppColors.primary,
                 icon: icon,
               ),
