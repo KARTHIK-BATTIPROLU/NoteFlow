@@ -1,13 +1,12 @@
 """
-Script to initialize MongoDB collections with sample data
-Run this script to set up your NoteFlow database with collections and sample data
+Script to initialize MongoDB collections with sample data.
+Run this script to set up your NoteFlow database with collections, indexes, and initial taxonomy seed.
 """
 import asyncio
-from motor.motor_asyncio import AsyncIOMotorClient
 import os
-from datetime import datetime
-
+from motor.motor_asyncio import AsyncIOMotorClient
 from dotenv import load_dotenv
+
 load_dotenv()
 
 MONGODB_URL = os.getenv("MONGODB_URL")
@@ -28,17 +27,15 @@ def _masked(url: str) -> str:
 
 
 async def init_database():
-    """Initialize MongoDB database with collections and sample data"""
+    """Initialize MongoDB database with collections, indexes, and seed sample data."""
     client = AsyncIOMotorClient(MONGODB_URL)
     db = client[DATABASE_NAME]
 
     print(f"Connected to MongoDB at {_masked(MONGODB_URL)}")
     print(f"Database: {DATABASE_NAME}")
 
-    # Create collections
+    collections_to_create = ["subjects", "topics", "resources", "users"]
     existing_collections = await db.list_collection_names()
-
-    collections_to_create = ["subjects", "topics", "resources"]
 
     for collection_name in collections_to_create:
         if collection_name not in existing_collections:
@@ -47,7 +44,6 @@ async def init_database():
         else:
             print(f"✓ Collection already exists: {collection_name}")
 
-    # Create indexes
     print("\nCreating indexes...")
 
     # Subjects indexes
@@ -60,50 +56,53 @@ async def init_database():
 
     # Resources indexes
     await db.resources.create_index([("title", 1), ("subject", 1), ("topic", 1)])
-    await db.resources.create_index("uploaded_at")
-    print("✓ Created indexes on resources")
+    await db.resources.create_index("created_at")
+    await db.resources.create_index("sha256")
+    await db.resources.create_index("firebase_uid")
+    await db.resources.create_index("subject")
+    print("✓ Created indexes on resources (created_at, sha256, firebase_uid, subject)")
 
-    # Check if we should add sample data
+    # Users indexes
+    await db.users.create_index("firebase_uid", unique=True)
+    print("✓ Created unique index on users.firebase_uid")
+
     subject_count = await db.subjects.count_documents({})
-
     if subject_count == 0:
-        print("\nAdding sample data...")
+        print("\nAdding taxonomy seed data...")
 
-        # EDIT THIS: replace with your real subjects/topics
         subjects = [
-            {"name": "Data Structures & Algorithms"},
-            {"name": "Database Management Systems"},
-            {"name": "Computer Networks"},
-            {"name": "Operating Systems"},
+            {"name": "Computer Science"},
+            {"name": "Mathematics"},
+            {"name": "Physics"},
+            {"name": "Chemistry"},
         ]
 
         subject_result = await db.subjects.insert_many(subjects)
         print(f"✓ Added {len(subject_result.inserted_ids)} subjects")
 
-        dsa_id, dbms_id, cn_id, os_id = subject_result.inserted_ids
+        cs_id, math_id, phy_id, chem_id = [str(sid) for sid in subject_result.inserted_ids]
 
-        # EDIT THIS: replace with your real subjects/topics
         topics = [
-            {"name": "Arrays & Linked Lists", "subject": str(dsa_id)},
-            {"name": "Trees & Graphs", "subject": str(dsa_id)},
-            {"name": "Sorting & Searching", "subject": str(dsa_id)},
-            {"name": "SQL Basics", "subject": str(dbms_id)},
-            {"name": "Normalization", "subject": str(dbms_id)},
-            {"name": "OSI Model", "subject": str(cn_id)},
-            {"name": "TCP/IP", "subject": str(cn_id)},
-            {"name": "Routing", "subject": str(cn_id)},
-            {"name": "Process Management", "subject": str(os_id)},
-            {"name": "Memory Management", "subject": str(os_id)},
+            {"name": "Data Structures & Algorithms", "subject": cs_id},
+            {"name": "Object-Oriented Programming", "subject": cs_id},
+            {"name": "Database Management Systems", "subject": cs_id},
+            {"name": "Operating Systems", "subject": cs_id},
+            {"name": "Computer Networks", "subject": cs_id},
+            {"name": "Calculus", "subject": math_id},
+            {"name": "Linear Algebra", "subject": math_id},
+            {"name": "Statistics", "subject": math_id},
+            {"name": "Mechanics", "subject": phy_id},
+            {"name": "Thermodynamics", "subject": phy_id},
+            {"name": "Organic Chemistry", "subject": chem_id},
+            {"name": "Inorganic Chemistry", "subject": chem_id},
         ]
 
         topic_result = await db.topics.insert_many(topics)
         print(f"✓ Added {len(topic_result.inserted_ids)} topics")
-
-        print("\n✓ Sample data added successfully!")
+        print("\n✓ Seed taxonomy added successfully!")
     else:
-        print(f"\n✓ Database already contains {subject_count} subjects. Skipping sample data.")
+        print(f"\n✓ Database already contains {subject_count} subjects. Skipping seed taxonomy.")
 
-    # Display collection stats
     print("\n" + "="*50)
     print("DATABASE STATISTICS")
     print("="*50)
