@@ -196,7 +196,7 @@ void main() {
     });
 
     test('error state handling works correctly', () {
-      var error = null;
+      String? error;
       var isUploading = false;
 
       // Set error

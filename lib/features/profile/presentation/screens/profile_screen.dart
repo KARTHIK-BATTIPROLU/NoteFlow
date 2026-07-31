@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/database/local_db.dart';
-import '../../../../core/services/api_service.dart';
 import '../../../../core/services/theme_service.dart';
 import '../../../../core/utils/toast.dart';
 import '../../../auth/data/auth_repository.dart';

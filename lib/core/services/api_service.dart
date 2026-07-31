@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:http_parser/http_parser.dart';
 import 'dart:io' show Platform, Directory, File;
 import 'dart:typed_data';
 import 'package:path_provider/path_provider.dart';

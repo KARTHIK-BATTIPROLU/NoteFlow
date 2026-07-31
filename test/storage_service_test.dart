@@ -121,7 +121,7 @@ void main() {
       // Upload stages: 10% start, 10-85% storage, 90% uploaded, 95% metadata, 100% done
       final startProgress = 0.1;
       final storageProgress = 0.5; // 50% of storage upload
-      final calculatedProgress = 0.1 + (storageProgress * 0.75);
+      final calculatedProgress = startProgress + (storageProgress * 0.75);
       
       expect(calculatedProgress, equals(0.475)); // 47.5%
     });
