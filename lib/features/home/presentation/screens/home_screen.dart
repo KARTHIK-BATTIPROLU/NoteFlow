@@ -50,7 +50,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           onTap: (index) {
             // Refresh Explore tab when returning from Upload tab
             if (_previousIndex == 2 && index == 0) {
-              ref.invalidate(userResourcesProvider); // Changed from allResourcesProvider
+              ref.read(communityFeedProvider.notifier).refresh();
             }
             setState(() {
               _previousIndex = _currentIndex;
@@ -89,7 +89,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 }
 
-// Explore Tab
+// Explore Tab with Paginated Community Feed
 class _ExploreTab extends ConsumerStatefulWidget {
   const _ExploreTab();
 
@@ -98,10 +98,30 @@ class _ExploreTab extends ConsumerStatefulWidget {
 }
 
 class _ExploreTabState extends ConsumerState<_ExploreTab> {
-  String? _selectedSubjectId;
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 300) {
+      ref.read(communityFeedProvider.notifier).loadMore();
+    }
+  }
 
   Future<void> _refresh() async {
-    ref.invalidate(userResourcesProvider); // Changed from allResourcesProvider
+    await ref.read(communityFeedProvider.notifier).refresh();
     ref.invalidate(subjectsProvider);
   }
 
@@ -115,21 +135,22 @@ class _ExploreTabState extends ConsumerState<_ExploreTab> {
   String _getUserName() {
     final user = ref.watch(authStateProvider).valueOrNull;
     if (user?.email != null) {
-      final emailPart = user!.email!.split('@').first;
-      return emailPart;
+      return user!.email!.split('@').first;
     }
     return 'there';
   }
 
   @override
   Widget build(BuildContext context) {
-    final resourcesAsync = ref.watch(userResourcesProvider); // Changed to userResourcesProvider
+    final feedState = ref.watch(communityFeedProvider);
     final subjectsAsync = ref.watch(subjectsProvider);
 
     return RefreshIndicator(
       onRefresh: _refresh,
       color: AppColors.primary,
       child: CustomScrollView(
+        controller: _scrollController,
+        physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
           // App Bar
           SliverAppBar(
@@ -181,12 +202,12 @@ class _ExploreTabState extends ConsumerState<_ExploreTab> {
             ),
           ),
 
-          // Subject Chips
+          // Subject Filter Chips
           SliverToBoxAdapter(
             child: subjectsAsync.when(
               data: (subjects) {
                 if (subjects.isEmpty) return const SizedBox.shrink();
-                
+
                 return SizedBox(
                   height: 50,
                   child: ListView.builder(
@@ -198,42 +219,41 @@ class _ExploreTabState extends ConsumerState<_ExploreTab> {
                     itemBuilder: (context, index) {
                       if (index == 0) {
                         // "All" chip
+                        final isAllSelected = feedState.selectedSubjectId == null;
                         return Padding(
                           padding: const EdgeInsets.only(right: AppSpacing.sm),
                           child: FilterChip(
-                            label: Text('All'),
-                            selected: _selectedSubjectId == null,
+                            label: const Text('All'),
+                            selected: isAllSelected,
                             onSelected: (selected) {
-                              setState(() {
-                                _selectedSubjectId = null;
-                              });
+                              ref.read(communityFeedProvider.notifier).selectSubject(null);
                             },
                             selectedColor: AppColors.primary.withValues(alpha: 0.2),
                             checkmarkColor: AppColors.primary,
                             labelStyle: AppTextStyles.bodyMedium.copyWith(
-                              color: _selectedSubjectId == null
+                              color: isAllSelected
                                   ? AppColors.primary
                                   : AppColors.textSecondary,
-                              fontWeight: _selectedSubjectId == null
+                              fontWeight: isAllSelected
                                   ? FontWeight.w600
                                   : FontWeight.normal,
                             ),
                           ),
                         );
                       }
-                      
+
                       final subject = subjects[index - 1];
-                      final isSelected = _selectedSubjectId == subject.id;
-                      
+                      final isSelected = feedState.selectedSubjectId == subject.id;
+
                       return Padding(
                         padding: const EdgeInsets.only(right: AppSpacing.sm),
                         child: FilterChip(
                           label: Text(subject.name),
                           selected: isSelected,
                           onSelected: (selected) {
-                            setState(() {
-                              _selectedSubjectId = selected ? subject.id : null;
-                            });
+                            ref
+                                .read(communityFeedProvider.notifier)
+                                .selectSubject(selected ? subject.id : null);
                           },
                           selectedColor: AppColors.primary.withValues(alpha: 0.2),
                           checkmarkColor: AppColors.primary,
@@ -263,7 +283,7 @@ class _ExploreTabState extends ConsumerState<_ExploreTab> {
             ),
           ),
 
-          // My Uploads Title
+          // Feed Header Title
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(
@@ -273,113 +293,127 @@ class _ExploreTabState extends ConsumerState<_ExploreTab> {
                 AppSpacing.md,
               ),
               child: Text(
-                'My uploads', // Changed from 'Recent uploads'
+                'Explore notes',
                 style: AppTextStyles.headingMedium,
               ),
             ),
           ),
 
-          // Resources List
-          resourcesAsync.when(
-            data: (resources) {
-              // Filter by selected subject if any
-              final filteredResources = _selectedSubjectId == null
-                  ? resources
-                  : resources.where((r) => r.subjectId == _selectedSubjectId).toList();
+          // Community Feed List
+          _buildFeedList(context, feedState),
 
-              if (filteredResources.isEmpty) {
-                return SliverFillRemaining(
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.folder_open,
-                          size: 64,
-                          color: AppColors.textSecondary.withValues(alpha: 0.5),
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        Text(
-                          'No resources found',
-                          style: AppTextStyles.bodyLarge.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        Text(
-                          'Upload your first resource!',
-                          style: AppTextStyles.bodySmall.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }
-
-              return SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final resource = filteredResources[index];
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.md,
-                        vertical: AppSpacing.xs,
-                      ),
-                      child: ResourceCard(
-                        resource: resource,
-                        onTap: () {
-                          if (resource.fileType.toLowerCase() == 'pdf') {
-                            context.push('/pdf-viewer', extra: resource);
-                          } else {
-                            Toast.show(
-                              context,
-                              'Only PDF files can be previewed in-app',
-                            );
-                          }
-                        },
-                      ),
-                    );
-                  },
-                  childCount: filteredResources.length,
-                ),
-              );
-            },
-            loading: () => const SliverToBoxAdapter(
-              child: LoadingSkeleton(count: 5),
-            ),
-            error: (error, stack) => SliverFillRemaining(
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.error_outline,
-                      size: 64,
-                      color: AppColors.error,
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    Text(
-                      'Failed to load resources',
-                      style: AppTextStyles.bodyLarge.copyWith(
-                        color: AppColors.error,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    Text(
-                      error.toString(),
-                      style: AppTextStyles.bodySmall.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
+          // Loading More Indicator at bottom
+          if (feedState.isLoadingMore)
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.all(AppSpacing.md),
+                child: Center(
+                  child: CircularProgressIndicator(),
                 ),
               ),
             ),
-          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildFeedList(BuildContext context, CommunityFeedState feedState) {
+    if (feedState.isLoading && feedState.resources.isEmpty) {
+      return const SliverToBoxAdapter(
+        child: LoadingSkeleton(count: 5),
+      );
+    }
+
+    if (feedState.error != null && feedState.resources.isEmpty) {
+      return SliverFillRemaining(
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.error_outline,
+                size: 64,
+                color: AppColors.error,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                'Failed to load notes',
+                style: AppTextStyles.bodyLarge.copyWith(color: AppColors.error),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                feedState.error!,
+                style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              ElevatedButton.icon(
+                onPressed: () => ref.read(communityFeedProvider.notifier).refresh(),
+                icon: const Icon(Icons.refresh),
+                label: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (feedState.resources.isEmpty) {
+      return SliverFillRemaining(
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.folder_open,
+                size: 64,
+                color: AppColors.textSecondary.withValues(alpha: 0.5),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                'No notes available in community feed',
+                style: AppTextStyles.bodyLarge.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                'Be the first to share notes!',
+                style: AppTextStyles.bodySmall.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return SliverList(
+      delegate: SliverChildBuilderDelegate(
+        (context, index) {
+          final resource = feedState.resources[index];
+          return Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.xs,
+            ),
+            child: ResourceCard(
+              resource: resource,
+              onTap: () {
+                if (resource.fileType.toLowerCase() == 'pdf') {
+                  context.push('/pdf-viewer', extra: resource);
+                } else {
+                  Toast.show(
+                    context,
+                    'Only PDF files can be previewed in-app',
+                  );
+                }
+              },
+            ),
+          );
+        },
+        childCount: feedState.resources.length,
       ),
     );
   }

@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/services/api_provider.dart';
 import '../../../../core/services/api_service.dart';
@@ -14,7 +15,8 @@ class ResourceRepository {
   ResourceRepository(this._apiService);
 
   Future<Resource> uploadResource({
-    required dynamic bytes,
+    required Uint8List bytes,
+    String? filePath,
     required String fileName,
     required String title,
     required String subject,
@@ -25,6 +27,7 @@ class ResourceRepository {
   }) async {
     return await _apiService.uploadResource(
       bytes: bytes,
+      filePath: filePath,
       fileName: fileName,
       title: title,
       subject: subject,

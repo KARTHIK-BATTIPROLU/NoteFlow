@@ -1,4 +1,7 @@
+import 'dart:io' show File;
+import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../features/auth/data/auth_repository.dart';
 import '../../data/resource_repository.dart';
@@ -13,7 +16,7 @@ class FilePickerService {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: allowedExtensions ?? ['pdf', 'ppt', 'pptx'],
-      withData: true,
+      withData: kIsWeb, // Memory efficient: only buffer bytes into RAM on Web
     );
 
     return result?.files.isNotEmpty == true ? result!.files.first : null;
@@ -79,27 +82,19 @@ class UploadNotifier extends StateNotifier<UploadState> {
       allowedExtensions: ['pdf', 'ppt', 'pptx'],
     );
     if (file != null) {
-      // Check file size (200MB = 200 * 1024 * 1024 bytes)
-      const maxSizeBytes = 200 * 1024 * 1024;
-      const warningSizeBytes = 50 * 1024 * 1024;
-      
+      // Backend max limit is 50 MB
+      const maxSizeBytes = 50 * 1024 * 1024;
+
       if (file.size > maxSizeBytes) {
         state = state.copyWith(
-          error: 'File size exceeds 200MB limit. Please select a smaller file.',
+          error: 'File size exceeds maximum 50MB limit. Please select a smaller file.',
         );
         return;
       }
-      
-      // Set warning for large files (50MB+)
-      String? warning;
-      if (file.size > warningSizeBytes) {
-        final sizeMB = (file.size / (1024 * 1024)).toStringAsFixed(1);
-        warning = 'Large file ($sizeMB MB) - upload may take time on mobile data';
-      }
-      
+
       state = state.copyWith(
         selectedFile: file,
-        error: warning, // Use error field to show warning
+        error: null,
       );
     }
   }
@@ -114,11 +109,11 @@ class UploadNotifier extends StateNotifier<UploadState> {
       return;
     }
     if (state.subject.isEmpty) {
-      state = state.copyWith(error: 'Please enter a subject');
+      state = state.copyWith(error: 'Please select a subject');
       return;
     }
     if (state.topic.isEmpty) {
-      state = state.copyWith(error: 'Please enter a topic');
+      state = state.copyWith(error: 'Please select a topic');
       return;
     }
 
@@ -133,18 +128,24 @@ class UploadNotifier extends StateNotifier<UploadState> {
     try {
       final repository = _ref.read(resourceRepositoryProvider);
 
-      final bytes = state.selectedFile!.bytes;
-      if (bytes == null) {
-        throw Exception('File bytes not available');
+      Uint8List? bytes = state.selectedFile!.bytes;
+      final filePath = state.selectedFile!.path;
+
+      if (bytes == null && filePath != null && !kIsWeb) {
+        bytes = await File(filePath).readAsBytes();
       }
-      final fileName =
-          '${DateTime.now().millisecondsSinceEpoch}_${state.selectedFile!.name}';
-      
+
+      if (bytes == null) {
+        throw Exception('Unable to read file content');
+      }
+
+      final fileName = state.selectedFile!.name;
       final token = await user.getIdToken();
       if (token == null) throw Exception('Unable to get authentication token');
 
       await repository.uploadResource(
         bytes: bytes,
+        filePath: filePath,
         fileName: fileName,
         title: state.title,
         subject: state.subject,
@@ -158,7 +159,8 @@ class UploadNotifier extends StateNotifier<UploadState> {
 
       state = state.copyWith(isUploading: false, isSuccess: true);
     } catch (e) {
-      state = state.copyWith(isUploading: false, error: e.toString());
+      final errorMsg = e.toString().replaceAll('Exception: ', '');
+      state = state.copyWith(isUploading: false, error: errorMsg);
     }
   }
 

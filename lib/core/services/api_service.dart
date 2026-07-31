@@ -4,20 +4,16 @@ import 'package:http_parser/http_parser.dart';
 import 'dart:io' show Platform, Directory, File;
 import 'dart:typed_data';
 import 'package:path_provider/path_provider.dart';
+import 'package:crypto/crypto.dart';
 import '../models/subject.dart';
 import '../models/topic.dart';
 import '../models/resource.dart';
 
 class ApiService {
-  // Backend server URL (MongoDB + GridFS)
   final String baseUrl = getBaseUrl();
 
   static String getBaseUrl() {
     return 'https://noteflow-uxwh.onrender.com';
-  }
-  
-  static String getFileDownloadUrl(String fileId) {
-    return '${getBaseUrl()}/file/$fileId';
   }
 
   // Get subjects from MongoDB
@@ -31,7 +27,6 @@ class ApiService {
         throw Exception('Failed to load subjects: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error fetching subjects: $e');
       throw Exception('Failed to load subjects: $e');
     }
   }
@@ -47,15 +42,28 @@ class ApiService {
         throw Exception('Failed to load topics: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error fetching topics: $e');
       throw Exception('Failed to load topics: $e');
     }
   }
 
-  // Get all resources from MongoDB
-  Future<List<Resource>> getAllResources() async {
+  // Get community resources with pagination and optional subject filtering
+  Future<List<Resource>> getCommunityResources({
+    int skip = 0,
+    int limit = 20,
+    String? subjectId,
+  }) async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/resources/'));
+      final queryParams = <String, String>{
+        'skip': skip.toString(),
+        'limit': limit.toString(),
+      };
+      if (subjectId != null && subjectId.isNotEmpty) {
+        queryParams['subject'] = subjectId;
+      }
+
+      final uri = Uri.parse('$baseUrl/resources/').replace(queryParameters: queryParams);
+      final response = await http.get(uri);
+
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
         return data.map((json) => Resource.fromJson(json)).toList();
@@ -63,12 +71,16 @@ class ApiService {
         throw Exception('Failed to load resources: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error fetching all resources: $e');
       throw Exception('Failed to load resources: $e');
     }
   }
 
-  // Get user's uploaded resources from MongoDB
+  // Legacy fallback: get all resources
+  Future<List<Resource>> getAllResources() async {
+    return getCommunityResources(skip: 0, limit: 50);
+  }
+
+  // Get user's uploaded resources
   Future<List<Resource>> getUserResources(String firebaseToken) async {
     try {
       final response = await http.get(
@@ -84,22 +96,21 @@ class ApiService {
         throw Exception('Failed to load user resources: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error fetching user resources: $e');
       throw Exception('Failed to load user resources: $e');
     }
   }
 
-  // Search resources in MongoDB
+  // Search resources
   Future<List<Resource>> searchResources({String? query, String? subjectId, String? topicId}) async {
     try {
       final queryParams = <String, String>{};
       if (query != null && query.isNotEmpty) queryParams['q'] = query;
       if (subjectId != null && subjectId.isNotEmpty) queryParams['subject'] = subjectId;
       if (topicId != null && topicId.isNotEmpty) queryParams['topic'] = topicId;
-      
+
       final uri = Uri.parse('$baseUrl/search/').replace(queryParameters: queryParams);
       final response = await http.get(uri);
-      
+
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
         return data.map((json) => Resource.fromJson(json)).toList();
@@ -107,12 +118,11 @@ class ApiService {
         throw Exception('Failed to search resources: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error searching resources: $e');
       throw Exception('Failed to search resources: $e');
     }
   }
 
-  // Get resources for a topic from MongoDB
+  // Get resources for a topic
   Future<List<Resource>> getResources(String topicId) async {
     try {
       final response = await http.get(Uri.parse('$baseUrl/topics/$topicId/resources/'));
@@ -123,14 +133,14 @@ class ApiService {
         throw Exception('Failed to load resources: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error fetching resources for topic: $e');
       throw Exception('Failed to load resources: $e');
     }
   }
 
-  // Upload file to MongoDB GridFS via backend
+  // 3-step presigned URL upload flow directly to Cloudflare R2
   Future<Resource> uploadResource({
     required Uint8List bytes,
+    String? filePath,
     required String fileName,
     required String title,
     required String subject,
@@ -140,164 +150,176 @@ class ApiService {
     void Function(double progress)? onProgress,
   }) async {
     try {
-      print('=== UPLOAD TO MONGODB/GRIDFS START ===');
-      print('Backend URL: $baseUrl/upload');
-      print('Title: $title');
-      print('Subject: $subject');
-      print('Topic: $topic');
-      print('File: $fileName');
-      print('Size: ${bytes.length} bytes (${(bytes.length / 1024 / 1024).toStringAsFixed(2)} MB)');
-      print('User: $firebaseUid');
-      
-      final uri = Uri.parse('$baseUrl/upload');
-      final request = http.MultipartRequest('POST', uri);
-
-      // Add Firebase auth token
-      request.headers['Authorization'] = 'Bearer $firebaseToken';
-      print('Authorization header added');
-
-      // Add form fields
-      request.fields['title'] = title;
-      request.fields['subject'] = subject;
-      request.fields['topic'] = topic;
-      print('Form fields added');
-
       // Determine content type
       final ext = fileName.split('.').last.toLowerCase();
-      MediaType? contentType;
+      String contentType;
       if (ext == 'pdf') {
-        contentType = MediaType('application', 'pdf');
-      } else if (ext == 'ppt' || ext == 'pptx') {
-        contentType = MediaType('application', 'vnd.ms-powerpoint');
+        contentType = 'application/pdf';
+      } else if (ext == 'pptx') {
+        contentType = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+      } else if (ext == 'ppt') {
+        contentType = 'application/vnd.ms-powerpoint';
       } else {
-        contentType = MediaType('application', 'octet-stream');
+        contentType = 'application/octet-stream';
       }
-      print('Content type: $contentType');
 
-      // Add file
-      final multipartFile = http.MultipartFile.fromBytes(
-        'file',
-        bytes,
-        filename: fileName,
-        contentType: contentType,
-      );
-      request.files.add(multipartFile);
-      print('File added to request');
+      // Compute SHA-256 hash
+      if (onProgress != null) onProgress(0.05);
+      final sha256Hash = sha256.convert(bytes).toString();
 
-      // Send request with progress tracking and timeout
-      if (onProgress != null) onProgress(0.1); // 10% - starting
-      print('Sending request to backend...');
-      
-      final streamedResponse = await request.send().timeout(
-        const Duration(seconds: 120), // 2 minute timeout for large files
-        onTimeout: () {
-          print('=== UPLOAD TIMEOUT ===');
-          print('Connection timed out after 120 seconds');
-          print('Possible causes:');
-          print('1. Backend server is not running');
-          print('2. Firewall is blocking port 8000');
-          print('3. Wrong IP address: $baseUrl');
-          print('4. Network connectivity issues');
-          print('');
-          print('SOLUTIONS:');
-          print('- Check if backend is running on $baseUrl');
-          print('- Add Windows Firewall rule for port 8000');
-          print('- Try USB debugging with: adb reverse tcp:8000 tcp:8000');
-          throw Exception('Connection timeout - Cannot reach backend server at $baseUrl. Check firewall settings and ensure backend is running.');
+      // Step A: POST /uploads/init
+      if (onProgress != null) onProgress(0.15);
+      final initUri = Uri.parse('$baseUrl/uploads/init');
+      final initResponse = await http.post(
+        initUri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $firebaseToken',
         },
+        body: jsonEncode({
+          'title': title,
+          'subject': subject,
+          'topic': topic,
+          'file_name': fileName,
+          'content_type': contentType,
+          'size': bytes.length,
+          'sha256': sha256Hash,
+        }),
       );
-      print('Response status: ${streamedResponse.statusCode}');
+
+      if (initResponse.statusCode != 200) {
+        throw Exception('Upload init failed (${initResponse.statusCode}): ${initResponse.body}');
+      }
+
+      final initData = jsonDecode(initResponse.body);
+      if (initData['duplicate'] == true) {
+        throw Exception('Duplicate upload detected. This resource already exists in NoteFlow.');
+      }
+
+      final uploadUrl = initData['upload_url'] as String;
+      final storageKey = initData['key'] as String;
+
+      // Step B: HTTP PUT file directly to Cloudflare R2 presigned URL
+      if (onProgress != null) onProgress(0.30);
       
-      // Track upload progress
-      int bytesReceived = 0;
-      final totalBytes = streamedResponse.contentLength ?? bytes.length;
-      
-      final responseBytes = <int>[];
-      await for (var chunk in streamedResponse.stream) {
-        responseBytes.addAll(chunk);
-        bytesReceived += chunk.length;
+      if (filePath != null && filePath.isNotEmpty && !Platform.isWindows && (Platform.isAndroid || Platform.isIOS)) {
+        // Stream from file path on mobile for memory efficiency
+        final file = File(filePath);
+        final fileStream = file.openRead();
+        final totalLength = await file.length();
         
-        if (onProgress != null && totalBytes > 0) {
-          final progress = 0.1 + (bytesReceived / totalBytes * 0.9); // 10-100%
-          onProgress(progress);
-          print('Upload progress: ${(progress * 100).toStringAsFixed(1)}%');
+        final putRequest = http.StreamedRequest('PUT', Uri.parse(uploadUrl));
+        putRequest.headers['Content-Type'] = contentType;
+        putRequest.contentLength = totalLength;
+
+        int bytesSent = 0;
+        fileStream.listen(
+          (chunk) {
+            bytesSent += chunk.length;
+            if (onProgress != null && totalLength > 0) {
+              final progress = 0.30 + (bytesSent / totalLength * 0.50);
+              onProgress(progress);
+            }
+          },
+          onDone: () {},
+          onError: (e) {},
+        );
+
+        final putStream = putRequest.sink;
+        await for (var chunk in fileStream) {
+          putStream.add(chunk);
+        }
+        await putStream.close();
+      } else {
+        // Fallback: direct bytes PUT
+        final putResponse = await http.put(
+          Uri.parse(uploadUrl),
+          headers: {'Content-Type': contentType},
+          body: bytes,
+        );
+
+        if (putResponse.statusCode != 200 && putResponse.statusCode != 204) {
+          throw Exception('Direct storage upload failed (${putResponse.statusCode}): ${putResponse.body}');
         }
       }
-      
-      final responseBody = utf8.decode(responseBytes);
-      print('Response body received: ${responseBody.substring(0, responseBody.length > 200 ? 200 : responseBody.length)}...');
-      
-      if (streamedResponse.statusCode == 200) {
-        if (onProgress != null) onProgress(1.0); // 100% - complete
-        print('=== UPLOAD SUCCESS ===');
-        
-        final responseData = jsonDecode(responseBody);
-        return Resource.fromJson(responseData);
-      } else {
-        print('=== UPLOAD FAILED ===');
-        print('Status code: ${streamedResponse.statusCode}');
-        print('Response: $responseBody');
-        throw Exception('Upload failed: ${streamedResponse.statusCode} - $responseBody');
+
+      // Step C: POST /uploads/complete
+      if (onProgress != null) onProgress(0.90);
+      final completeUri = Uri.parse('$baseUrl/uploads/complete');
+      final completeResponse = await http.post(
+        completeUri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $firebaseToken',
+        },
+        body: jsonEncode({
+          'key': storageKey,
+          'title': title,
+          'subject': subject,
+          'topic': topic,
+          'file_name': fileName,
+          'content_type': contentType,
+          'size': bytes.length,
+          'sha256': sha256Hash,
+        }),
+      );
+
+      if (completeResponse.statusCode != 200) {
+        throw Exception('Upload completion failed (${completeResponse.statusCode}): ${completeResponse.body}');
       }
-    } catch (e, stackTrace) {
-      print('=== UPLOAD ERROR ===');
-      print('Error: $e');
-      print('Stack trace: $stackTrace');
-      
-      // Provide helpful error messages
-      if (e.toString().contains('SocketException') || e.toString().contains('Connection')) {
-        throw Exception(
-          'Cannot connect to backend server at $baseUrl.\n\n'
-          'Possible solutions:\n'
-          '1. Ensure backend is running\n'
-          '2. Add Windows Firewall rule for port 8000\n'
-          '3. Use USB debugging: adb reverse tcp:8000 tcp:8000\n'
-          '4. Check network connectivity\n\n'
-          'See QUICK_FIX_STEPS.md for detailed instructions.'
-        );
-      }
-      
+
+      if (onProgress != null) onProgress(1.0);
+      final resourceData = jsonDecode(completeResponse.body);
+      return Resource.fromJson(resourceData);
+    } catch (e) {
       throw Exception('Upload failed: $e');
     }
   }
 
-  /// Downloads a file from GridFS and saves it to a temporary location
-  /// Returns the local file path on success, throws exception on failure
-  Future<String> downloadFile(String fileId, {
+  // Download file via presigned GET URL from R2
+  Future<String> downloadFile(
+    String resourceId, {
     void Function(double progress)? onProgress,
   }) async {
     try {
-      print('Downloading file from GridFS: $fileId');
-      final url = '$baseUrl/file/$fileId';
-      final response = await http.get(Uri.parse(url));
-      
-      if (response.statusCode == 200) {
-        // Get temporary directory
-        Directory tempDir;
-        if (Platform.environment['TEMP'] != null) {
-          tempDir = Directory(Platform.environment['TEMP']!);
-        } else {
-          tempDir = await getTemporaryDirectory();
-        }
-        
-        // Create file path
-        final filePath = '${tempDir.path}/$fileId.pdf';
-        final file = File(filePath);
-        
-        // Write bytes to file
-        await file.writeAsBytes(response.bodyBytes);
-        print('File downloaded to: $filePath');
-        
-        if (onProgress != null) {
-          onProgress(1.0);
-        }
-        
-        return filePath;
-      } else {
-        throw Exception('Failed to download file: HTTP ${response.statusCode}');
+      // Step 1: Get presigned download URL from backend
+      final downloadInfoUri = Uri.parse('$baseUrl/resources/$resourceId/download');
+      final infoResponse = await http.get(downloadInfoUri);
+
+      if (infoResponse.statusCode != 200) {
+        throw Exception('Failed to get download URL: HTTP ${infoResponse.statusCode}');
       }
+
+      final infoData = jsonDecode(infoResponse.body);
+      final downloadUrl = infoData['download_url'] as String;
+
+      // Step 2: Download file directly from presigned R2 URL
+      final fileResponse = await http.get(Uri.parse(downloadUrl));
+      if (fileResponse.statusCode != 200) {
+        throw Exception('Storage download failed: HTTP ${fileResponse.statusCode}');
+      }
+
+      // Determine extension
+      String ext = 'pdf';
+      final contentTypeHeader = fileResponse.headers['content-type'] ?? '';
+      if (contentTypeHeader.contains('powerpoint') || contentTypeHeader.contains('presentation')) {
+        ext = 'pptx';
+      }
+
+      Directory tempDir;
+      if (Platform.environment['TEMP'] != null) {
+        tempDir = Directory(Platform.environment['TEMP']!);
+      } else {
+        tempDir = await getTemporaryDirectory();
+      }
+
+      final filePath = '${tempDir.path}/resource_$resourceId.$ext';
+      final file = File(filePath);
+      await file.writeAsBytes(fileResponse.bodyBytes);
+
+      if (onProgress != null) onProgress(1.0);
+      return filePath;
     } catch (e) {
-      print('Download error: $e');
       throw Exception('Download error: $e');
     }
   }

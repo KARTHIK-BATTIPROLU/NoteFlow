@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/toast.dart';
+import '../../../home/presentation/providers/search_provider.dart';
 import '../providers/upload_provider.dart';
 
 class UploadScreen extends ConsumerStatefulWidget {
@@ -15,52 +16,8 @@ class UploadScreen extends ConsumerStatefulWidget {
 class _UploadScreenState extends ConsumerState<UploadScreen> with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
-  final _topicController = TextEditingController();
   
   bool _formSubmitted = false;
-  
-  // Static predefined subjects
-  final List<Map<String, String>> _predefinedSubjects = [
-    {'id': 'cs', 'name': 'Computer Science'},
-    {'id': 'math', 'name': 'Mathematics'},
-    {'id': 'physics', 'name': 'Physics'},
-    {'id': 'chemistry', 'name': 'Chemistry'},
-  ];
-  
-  // Static predefined topics for each subject
-  final Map<String, List<Map<String, String>>> _predefinedTopics = {
-    'cs': [
-      {'id': 'cs_dsa', 'name': 'Data Structures & Algorithms'},
-      {'id': 'cs_oop', 'name': 'Object-Oriented Programming'},
-      {'id': 'cs_db', 'name': 'Database Management'},
-      {'id': 'cs_os', 'name': 'Operating Systems'},
-      {'id': 'cs_networks', 'name': 'Computer Networks'},
-      {'id': 'cs_web', 'name': 'Web Development'},
-      {'id': 'cs_ai', 'name': 'Artificial Intelligence'},
-      {'id': 'cs_ml', 'name': 'Machine Learning'},
-    ],
-    'math': [
-      {'id': 'math_calculus', 'name': 'Calculus'},
-      {'id': 'math_algebra', 'name': 'Linear Algebra'},
-      {'id': 'math_stats', 'name': 'Statistics'},
-      {'id': 'math_discrete', 'name': 'Discrete Mathematics'},
-      {'id': 'math_diff', 'name': 'Differential Equations'},
-    ],
-    'physics': [
-      {'id': 'phy_mechanics', 'name': 'Mechanics'},
-      {'id': 'phy_thermo', 'name': 'Thermodynamics'},
-      {'id': 'phy_em', 'name': 'Electromagnetism'},
-      {'id': 'phy_optics', 'name': 'Optics'},
-      {'id': 'phy_quantum', 'name': 'Quantum Physics'},
-    ],
-    'chemistry': [
-      {'id': 'chem_organic', 'name': 'Organic Chemistry'},
-      {'id': 'chem_inorganic', 'name': 'Inorganic Chemistry'},
-      {'id': 'chem_physical', 'name': 'Physical Chemistry'},
-      {'id': 'chem_analytical', 'name': 'Analytical Chemistry'},
-    ],
-  };
-  
   String? _selectedSubjectId;
   String? _selectedTopicId;
   
@@ -85,7 +42,6 @@ class _UploadScreenState extends ConsumerState<UploadScreen> with SingleTickerPr
   @override
   void dispose() {
     _titleController.dispose();
-    _topicController.dispose();
     _successAnimationController.dispose();
     super.dispose();
   }
@@ -143,10 +99,9 @@ class _UploadScreenState extends ConsumerState<UploadScreen> with SingleTickerPr
           Future.delayed(const Duration(milliseconds: 1500), () {
             notifier.reset();
             _titleController.clear();
-            _topicController.clear();
-            _selectedSubjectId = null;
-            _selectedTopicId = null;
             setState(() {
+              _selectedSubjectId = null;
+              _selectedTopicId = null;
               _formSubmitted = false;
             });
             _successAnimationController.reset();
@@ -179,12 +134,12 @@ class _UploadScreenState extends ConsumerState<UploadScreen> with SingleTickerPr
               
               const SizedBox(height: AppSpacing.lg),
               
-              // Subject Field with Autocomplete
+              // Subject Field (backend dynamic dropdown)
               _buildSubjectField(notifier),
               
               const SizedBox(height: AppSpacing.lg),
               
-              // Topic Field with Autocomplete
+              // Topic Field (backend dynamic dropdown)
               _buildTopicField(notifier),
               
               const SizedBox(height: AppSpacing.xl),
@@ -213,9 +168,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> with SingleTickerPr
               : AppColors.surface,
           borderRadius: BorderRadius.circular(AppRadius.lg),
           border: Border.all(
-            color: hasFile 
-                ? AppColors.primary.withOpacity(0.4)
-                : AppColors.primary.withOpacity(0.4),
+            color: AppColors.primary.withOpacity(0.4),
             width: 2,
             strokeAlign: BorderSide.strokeAlignInside,
           ),
@@ -246,7 +199,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> with SingleTickerPr
         ),
         const SizedBox(height: AppSpacing.sm),
         Text(
-          'Supported formats: PDF, PPT, PPTX',
+          'Supported formats: PDF, PPT, PPTX (max 50 MB)',
           style: AppTextStyles.bodySmall.copyWith(
             color: AppColors.textHint,
           ),
@@ -322,9 +275,9 @@ class _UploadScreenState extends ConsumerState<UploadScreen> with SingleTickerPr
         const SizedBox(height: AppSpacing.sm),
         TextFormField(
           controller: _titleController,
-          decoration: InputDecoration(
+          decoration: const InputDecoration(
             hintText: 'Enter resource title',
-            prefixIcon: const Icon(Icons.title, size: 20),
+            prefixIcon: Icon(Icons.title, size: 20),
             errorMaxLines: 2,
           ),
           onChanged: notifier.setTitle,
@@ -340,6 +293,8 @@ class _UploadScreenState extends ConsumerState<UploadScreen> with SingleTickerPr
   }
 
   Widget _buildSubjectField(UploadNotifier notifier) {
+    final subjectsAsync = ref.watch(subjectsProvider);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -351,46 +306,76 @@ class _UploadScreenState extends ConsumerState<UploadScreen> with SingleTickerPr
           ),
         ),
         const SizedBox(height: AppSpacing.sm),
-        DropdownButtonFormField<String>(
-          value: _selectedSubjectId,
-          decoration: InputDecoration(
-            hintText: 'Select a subject',
-            prefixIcon: const Icon(Icons.school, size: 20),
-            errorMaxLines: 2,
-          ),
-          items: _predefinedSubjects.map((subject) {
-            return DropdownMenuItem<String>(
-              value: subject['id'],
-              child: Text(subject['name']!),
+        subjectsAsync.when(
+          data: (subjects) {
+            return DropdownButtonFormField<String>(
+              value: _selectedSubjectId,
+              decoration: const InputDecoration(
+                hintText: 'Select a subject',
+                prefixIcon: Icon(Icons.school, size: 20),
+                errorMaxLines: 2,
+              ),
+              items: subjects.map((subject) {
+                return DropdownMenuItem<String>(
+                  value: subject.id, // Backend MongoDB ObjectId string
+                  child: Text(subject.name),
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() {
+                  _selectedSubjectId = value;
+                  _selectedTopicId = null;
+                });
+                if (value != null) {
+                  notifier.setSubject(value);
+                  notifier.setTopic('');
+                }
+              },
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please select a subject';
+                }
+                return null;
+              },
             );
-          }).toList(),
-          onChanged: (value) {
-            setState(() {
-              _selectedSubjectId = value;
-              _selectedTopicId = null; // Reset topic when subject changes
-              _topicController.clear();
-            });
-            if (value != null) {
-              notifier.setSubject(value);
-              notifier.setTopic(''); // Clear topic
-            }
           },
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Please select a subject';
-            }
-            return null;
-          },
+          loading: () => const LinearProgressIndicator(),
+          error: (err, stack) => Text(
+            'Failed to load subjects',
+            style: TextStyle(color: AppColors.error),
+          ),
         ),
       ],
     );
   }
 
   Widget _buildTopicField(UploadNotifier notifier) {
-    final availableTopics = _selectedSubjectId != null 
-        ? _predefinedTopics[_selectedSubjectId!] ?? []
-        : [];
-    
+    if (_selectedSubjectId == null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Topic',
+            style: AppTextStyles.bodyMedium.copyWith(
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          DropdownButtonFormField<String>(
+            items: const [],
+            onChanged: null,
+            decoration: const InputDecoration(
+              hintText: 'Select a subject first',
+              prefixIcon: Icon(Icons.topic, size: 20),
+            ),
+          ),
+        ],
+      );
+    }
+
+    final topicsAsync = ref.watch(topicsProvider(_selectedSubjectId!));
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -402,35 +387,42 @@ class _UploadScreenState extends ConsumerState<UploadScreen> with SingleTickerPr
           ),
         ),
         const SizedBox(height: AppSpacing.sm),
-        DropdownButtonFormField<String>(
-          value: _selectedTopicId,
-          decoration: InputDecoration(
-            hintText: _selectedSubjectId == null 
-                ? 'Select a subject first'
-                : 'Select a topic',
-            prefixIcon: const Icon(Icons.topic, size: 20),
-            errorMaxLines: 2,
-          ),
-          items: availableTopics.map((topic) {
-            return DropdownMenuItem<String>(
-              value: topic['id'],
-              child: Text(topic['name']!),
+        topicsAsync.when(
+          data: (topics) {
+            return DropdownButtonFormField<String>(
+              value: _selectedTopicId,
+              decoration: const InputDecoration(
+                hintText: 'Select a topic',
+                prefixIcon: Icon(Icons.topic, size: 20),
+                errorMaxLines: 2,
+              ),
+              items: topics.map((topic) {
+                return DropdownMenuItem<String>(
+                  value: topic.id, // Backend MongoDB ObjectId string
+                  child: Text(topic.name),
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() {
+                  _selectedTopicId = value;
+                });
+                if (value != null) {
+                  notifier.setTopic(value);
+                }
+              },
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please select a topic';
+                }
+                return null;
+              },
             );
-          }).toList(),
-          onChanged: _selectedSubjectId == null ? null : (value) {
-            setState(() {
-              _selectedTopicId = value;
-            });
-            if (value != null) {
-              notifier.setTopic(value);
-            }
           },
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Please select a topic';
-            }
-            return null;
-          },
+          loading: () => const LinearProgressIndicator(),
+          error: (err, stack) => Text(
+            'Failed to load topics',
+            style: TextStyle(color: AppColors.error),
+          ),
         ),
       ],
     );

@@ -7,6 +7,7 @@ import '../../../../core/services/api_service.dart';
 import '../../../../core/services/theme_service.dart';
 import '../../../../core/utils/toast.dart';
 import '../../../auth/data/auth_repository.dart';
+import '../../../home/presentation/providers/search_provider.dart';
 import '../../../home/presentation/screens/downloads_screen.dart';
 import 'edit_profile_screen.dart';
 
@@ -18,18 +19,9 @@ final userStatsProvider = FutureProvider.autoDispose<UserStats>((ref) async {
   }
 
   try {
-    final apiService = ApiService();
-    final allResources = await apiService.getAllResources();
-    
-    // Filter resources by current user's firebase_uid
-    final userUploads = allResources
-        .where((resource) => resource.firebaseUid == user.uid)
-        .toList();
-    
-    // Get downloads from Hive
+    final userUploads = await ref.watch(userResourcesProvider.future);
     final downloads = LocalDb.getAllDownloads();
     
-    // Get unique subjects from downloads
     final uniqueSubjects = <String>{};
     for (var download in downloads) {
       final subjectId = download['subject_id'] ?? download['subjectId'];

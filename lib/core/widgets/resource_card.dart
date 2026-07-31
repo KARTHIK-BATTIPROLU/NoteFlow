@@ -193,8 +193,11 @@ class ResourceCard extends StatelessWidget {
     );
   }
 
-  /// Get uploader name (first 8 characters of firebase_uid)
+  /// Get uploader name (pseudonymous handle or truncated uid)
   String _getUploaderName() {
+    if (resource.uploaderHandle != null && resource.uploaderHandle!.isNotEmpty) {
+      return resource.uploaderHandle!;
+    }
     if (resource.firebaseUid.length <= 8) {
       return resource.firebaseUid;
     }
