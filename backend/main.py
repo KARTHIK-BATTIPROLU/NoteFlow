@@ -84,10 +84,10 @@ if not firebase_admin.get_app().project_id:
 app = FastAPI(title="NoteFlow API", version="1.0.0")
 
 # CORS middleware
-CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "*").split(",")
+origins = os.environ.get("ALLOWED_ORIGINS", "*").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=CORS_ORIGINS if CORS_ORIGINS != ["*"] else ["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -115,6 +115,19 @@ async def shutdown_db_client():
 @app.get("/")
 async def root():
     return {"message": "Welcome to NoteFlow API"}
+
+
+@app.get("/health")
+async def health():
+    try:
+        import database
+        client = database.client
+        if client is None:
+            raise RuntimeError("Database client not initialized")
+        await client.admin.command("ping")
+        return {"status": "ok", "db": "connected"}
+    except Exception as e:
+        return {"status": "error", "db": str(e)}
 
 
 async def initialize_collections():
@@ -475,3 +488,20 @@ async def get_user_resources(
     cursor = resources_collection().find({"firebase_uid": firebase_uid}).sort("created_at", -1)
     resources = await cursor.to_list(length=None)
     return await enrich_resources(resources)
+
+
+# -----------------------------------------------------------------------------
+# Render Free Tier Cold Start Keep-Alive Note:
+# Render spins down free-tier web services after 15 minutes of inactivity.
+# The subsequent request takes ~30-50 seconds to complete (cold start).
+# To keep the instance warm, configure a free external ping monitor (e.g.,
+# cron-job.org, UptimeRobot, or BetterUptime) to send an HTTP GET request to:
+#   GET https://<your-render-app-name>.onrender.com/health
+# at an interval of every 10 to 14 minutes.
+# -----------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
+

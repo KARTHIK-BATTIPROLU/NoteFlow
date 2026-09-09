@@ -45,7 +45,7 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> {
     try {
       final apiService = ref.read(apiServiceProvider);
       final filePath = await apiService.downloadFile(
-        widget.resource.fileId,
+        widget.resource.id,
         onProgress: (progress) {
           // Progress callback if needed
         },
@@ -76,26 +76,12 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> {
     });
 
     try {
-      // Request storage permission
-      if (Platform.isAndroid) {
-        final status = await Permission.storage.request();
-        if (!status.isGranted) {
-          throw Exception('Storage permission denied');
-        }
-      }
-
-      // Get downloads directory
+      // Get safe directory across platforms (scoped-storage compliant)
       Directory? downloadsDir;
-      if (Platform.isAndroid) {
-        downloadsDir = Directory('/storage/emulated/0/Download');
-      } else if (Platform.isIOS) {
+      if (Platform.isAndroid || Platform.isIOS) {
         downloadsDir = await getApplicationDocumentsDirectory();
       } else {
-        downloadsDir = await getDownloadsDirectory();
-      }
-
-      if (downloadsDir == null) {
-        throw Exception('Could not access downloads directory');
+        downloadsDir = await getDownloadsDirectory() ?? await getApplicationDocumentsDirectory();
       }
 
       // Create destination file

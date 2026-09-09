@@ -4,21 +4,39 @@ import 'dart:io' show Platform, Directory, File;
 import 'dart:typed_data';
 import 'package:path_provider/path_provider.dart';
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
 import '../models/subject.dart';
 import '../models/topic.dart';
 import '../models/resource.dart';
 
 class ApiService {
-  final String baseUrl = getBaseUrl();
+  final http.Client _client;
+  final String baseUrl;
+
+  ApiService({http.Client? client, String? baseUrl})
+      : _client = client ?? http.Client(),
+        baseUrl = baseUrl ?? getBaseUrl();
 
   static String getBaseUrl() {
+    const envUrl = String.fromEnvironment('API_URL');
+    if (envUrl.isNotEmpty) {
+      return envUrl;
+    }
+
+    if (kDebugMode) {
+      if (!kIsWeb && Platform.isAndroid) {
+        return 'http://10.0.2.2:8000';
+      }
+      return 'http://localhost:8000';
+    }
+
     return 'https://noteflow-uxwh.onrender.com';
   }
 
   // Get subjects from MongoDB
   Future<List<Subject>> getSubjects() async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/subjects/'));
+      final response = await _client.get(Uri.parse('$baseUrl/subjects/'));
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
         return data.map((json) => Subject.fromJson(json)).toList();
@@ -33,7 +51,7 @@ class ApiService {
   // Get topics from MongoDB
   Future<List<Topic>> getTopics(String subjectId) async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/subjects/$subjectId/topics/'));
+      final response = await _client.get(Uri.parse('$baseUrl/subjects/$subjectId/topics/'));
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
         return data.map((json) => Topic.fromJson(json)).toList();
@@ -61,7 +79,7 @@ class ApiService {
       }
 
       final uri = Uri.parse('$baseUrl/resources/').replace(queryParameters: queryParams);
-      final response = await http.get(uri);
+      final response = await _client.get(uri);
 
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
@@ -82,7 +100,7 @@ class ApiService {
   // Get user's uploaded resources
   Future<List<Resource>> getUserResources(String firebaseToken) async {
     try {
-      final response = await http.get(
+      final response = await _client.get(
         Uri.parse('$baseUrl/user/resources/'),
         headers: {
           'Authorization': 'Bearer $firebaseToken',
@@ -108,7 +126,7 @@ class ApiService {
       if (topicId != null && topicId.isNotEmpty) queryParams['topic'] = topicId;
 
       final uri = Uri.parse('$baseUrl/search/').replace(queryParameters: queryParams);
-      final response = await http.get(uri);
+      final response = await _client.get(uri);
 
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
@@ -124,7 +142,7 @@ class ApiService {
   // Get resources for a topic
   Future<List<Resource>> getResources(String topicId) async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/topics/$topicId/resources/'));
+      final response = await _client.get(Uri.parse('$baseUrl/topics/$topicId/resources/'));
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
         return data.map((json) => Resource.fromJson(json)).toList();
@@ -169,7 +187,7 @@ class ApiService {
       // Step A: POST /uploads/init
       if (onProgress != null) onProgress(0.15);
       final initUri = Uri.parse('$baseUrl/uploads/init');
-      final initResponse = await http.post(
+      final initResponse = await _client.post(
         initUri,
         headers: {
           'Content-Type': 'application/json',
@@ -200,52 +218,21 @@ class ApiService {
 
       // Step B: HTTP PUT file directly to Cloudflare R2 presigned URL
       if (onProgress != null) onProgress(0.30);
-      
-      if (filePath != null && filePath.isNotEmpty && !Platform.isWindows && (Platform.isAndroid || Platform.isIOS)) {
-        // Stream from file path on mobile for memory efficiency
-        final file = File(filePath);
-        final fileStream = file.openRead();
-        final totalLength = await file.length();
-        
-        final putRequest = http.StreamedRequest('PUT', Uri.parse(uploadUrl));
-        putRequest.headers['Content-Type'] = contentType;
-        putRequest.contentLength = totalLength;
 
-        int bytesSent = 0;
-        fileStream.listen(
-          (chunk) {
-            bytesSent += chunk.length;
-            if (onProgress != null && totalLength > 0) {
-              final progress = 0.30 + (bytesSent / totalLength * 0.50);
-              onProgress(progress);
-            }
-          },
-          onDone: () {},
-          onError: (e) {},
-        );
+      final putResponse = await _client.put(
+        Uri.parse(uploadUrl),
+        headers: {'Content-Type': contentType},
+        body: bytes,
+      );
 
-        final putStream = putRequest.sink;
-        await for (var chunk in fileStream) {
-          putStream.add(chunk);
-        }
-        await putStream.close();
-      } else {
-        // Fallback: direct bytes PUT
-        final putResponse = await http.put(
-          Uri.parse(uploadUrl),
-          headers: {'Content-Type': contentType},
-          body: bytes,
-        );
-
-        if (putResponse.statusCode != 200 && putResponse.statusCode != 204) {
-          throw Exception('Direct storage upload failed (${putResponse.statusCode}): ${putResponse.body}');
-        }
+      if (putResponse.statusCode != 200 && putResponse.statusCode != 204) {
+        throw Exception('Direct storage upload failed (${putResponse.statusCode}): ${putResponse.body}');
       }
 
       // Step C: POST /uploads/complete
       if (onProgress != null) onProgress(0.90);
       final completeUri = Uri.parse('$baseUrl/uploads/complete');
-      final completeResponse = await http.post(
+      final completeResponse = await _client.post(
         completeUri,
         headers: {
           'Content-Type': 'application/json',
@@ -283,7 +270,7 @@ class ApiService {
     try {
       // Step 1: Get presigned download URL from backend
       final downloadInfoUri = Uri.parse('$baseUrl/resources/$resourceId/download');
-      final infoResponse = await http.get(downloadInfoUri);
+      final infoResponse = await _client.get(downloadInfoUri);
 
       if (infoResponse.statusCode != 200) {
         throw Exception('Failed to get download URL: HTTP ${infoResponse.statusCode}');
@@ -293,7 +280,7 @@ class ApiService {
       final downloadUrl = infoData['download_url'] as String;
 
       // Step 2: Download file directly from presigned R2 URL
-      final fileResponse = await http.get(Uri.parse(downloadUrl));
+      final fileResponse = await _client.get(Uri.parse(downloadUrl));
       if (fileResponse.statusCode != 200) {
         throw Exception('Storage download failed: HTTP ${fileResponse.statusCode}');
       }
@@ -306,7 +293,7 @@ class ApiService {
       }
 
       Directory tempDir;
-      if (Platform.environment['TEMP'] != null) {
+      if (!kIsWeb && Platform.environment['TEMP'] != null) {
         tempDir = Directory(Platform.environment['TEMP']!);
       } else {
         tempDir = await getTemporaryDirectory();

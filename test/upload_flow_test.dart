@@ -3,15 +3,15 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   group('Upload Flow Tests', () {
     test('file size validation works correctly', () {
-      const maxSizeBytes = 200 * 1024 * 1024; // 200 MB
-      const warningSizeBytes = 50 * 1024 * 1024; // 50 MB
+      const maxSizeBytes = 50 * 1024 * 1024; // 50 MB limit
+      const warningSizeBytes = 25 * 1024 * 1024; // 25 MB
 
       // Test cases
       final testCases = [
         {'size': 10 * 1024 * 1024, 'shouldWarn': false, 'shouldBlock': false}, // 10 MB
-        {'size': 60 * 1024 * 1024, 'shouldWarn': true, 'shouldBlock': false}, // 60 MB
-        {'size': 150 * 1024 * 1024, 'shouldWarn': true, 'shouldBlock': false}, // 150 MB
-        {'size': 250 * 1024 * 1024, 'shouldWarn': true, 'shouldBlock': true}, // 250 MB
+        {'size': 30 * 1024 * 1024, 'shouldWarn': true, 'shouldBlock': false}, // 30 MB
+        {'size': 45 * 1024 * 1024, 'shouldWarn': true, 'shouldBlock': false}, // 45 MB
+        {'size': 60 * 1024 * 1024, 'shouldWarn': true, 'shouldBlock': true}, // 60 MB
       ];
 
       for (final testCase in testCases) {

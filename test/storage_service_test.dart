@@ -86,16 +86,16 @@ void main() {
     });
 
     test('file size warning threshold is correct', () {
-      const warningSizeBytes = 50 * 1024 * 1024; // 50 MB
-      const maxSizeBytes = 200 * 1024 * 1024; // 200 MB
+      const warningSizeBytes = 25 * 1024 * 1024; // 25 MB
+      const maxSizeBytes = 50 * 1024 * 1024; // 50 MB
       
       final smallFile = 10 * 1024 * 1024; // 10 MB
-      final largeFile = 100 * 1024 * 1024; // 100 MB
-      final tooLargeFile = 250 * 1024 * 1024; // 250 MB
+      final mediumFile = 30 * 1024 * 1024; // 30 MB
+      final tooLargeFile = 60 * 1024 * 1024; // 60 MB
       
       expect(smallFile < warningSizeBytes, isTrue);
-      expect(largeFile > warningSizeBytes, isTrue);
-      expect(largeFile < maxSizeBytes, isTrue);
+      expect(mediumFile > warningSizeBytes, isTrue);
+      expect(mediumFile < maxSizeBytes, isTrue);
       expect(tooLargeFile > maxSizeBytes, isTrue);
     });
   });

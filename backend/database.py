@@ -13,7 +13,7 @@ if not MONGODB_URL:
     )
 MONGODB_URL = MONGODB_URL.strip()
 
-DATABASE_NAME = "noteflow"
+DATABASE_NAME = os.getenv("DATABASE_NAME", "noteflow").strip()
 
 client: Optional[AsyncIOMotorClient] = None
 

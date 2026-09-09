@@ -1,0 +1,13 @@
+﻿services:
+  - type: web
+    name: noteflow-api
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: MONGODB_URL
+        sync: false
+      - key: DATABASE_NAME
+        value: noteflow
+      - key: ALLOWED_ORIGINS
+        sync: false
