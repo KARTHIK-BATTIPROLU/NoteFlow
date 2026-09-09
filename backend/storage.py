@@ -11,13 +11,29 @@ R2_SECRET_ACCESS_KEY = os.environ.get("R2_SECRET_ACCESS_KEY")
 R2_BUCKET = os.environ.get("R2_BUCKET")
 
 
+def is_configured() -> bool:
+    """Check if Cloudflare R2 environment variables are present."""
+    endpoint = os.environ.get("R2_ENDPOINT")
+    account_id = os.environ.get("R2_ACCOUNT_ID")
+    if not endpoint and account_id:
+        endpoint = f"https://{account_id}.r2.cloudflarestorage.com"
+    access_key = os.environ.get("R2_ACCESS_KEY_ID")
+    secret_key = os.environ.get("R2_SECRET_ACCESS_KEY")
+    bucket = os.environ.get("R2_BUCKET")
+    return bool(endpoint and access_key and secret_key and bucket)
+
+
 def get_s3_client():
     """Return a boto3 S3 client configured for Cloudflare R2."""
-    endpoint = R2_ENDPOINT
-    if not endpoint and R2_ACCOUNT_ID:
-        endpoint = f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
-    
-    if not endpoint or not R2_ACCESS_KEY_ID or not R2_SECRET_ACCESS_KEY or not R2_BUCKET:
+    endpoint = os.environ.get("R2_ENDPOINT")
+    account_id = os.environ.get("R2_ACCOUNT_ID")
+    if not endpoint and account_id:
+        endpoint = f"https://{account_id}.r2.cloudflarestorage.com"
+    access_key = os.environ.get("R2_ACCESS_KEY_ID")
+    secret_key = os.environ.get("R2_SECRET_ACCESS_KEY")
+    bucket = os.environ.get("R2_BUCKET")
+
+    if not endpoint or not access_key or not secret_key or not bucket:
         raise RuntimeError(
             "Missing Cloudflare R2 environment variables. "
             "Please ensure R2_ENDPOINT (or R2_ACCOUNT_ID), R2_ACCESS_KEY_ID, "
@@ -27,8 +43,8 @@ def get_s3_client():
     return boto3.client(
         "s3",
         endpoint_url=endpoint,
-        aws_access_key_id=R2_ACCESS_KEY_ID,
-        aws_secret_access_key=R2_SECRET_ACCESS_KEY,
+        aws_access_key_id=access_key,
+        aws_secret_access_key=secret_key,
         config=Config(signature_version="s3v4"),
         region_name="auto"
     )

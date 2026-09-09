@@ -304,6 +304,12 @@ async def upload_init(
 ):
     """Initialize file upload by validating metadata and generating R2 presigned PUT URL."""
     try:
+        if not storage.is_configured():
+            raise HTTPException(
+                status_code=503,
+                detail="File storage (Cloudflare R2) is not configured yet. Uploads will be enabled soon."
+            )
+
         # Validate size limit
         if req.size > MAX_FILE_SIZE:
             raise HTTPException(status_code=400, detail=f"File size exceeds maximum limit of 50MB")
@@ -348,6 +354,12 @@ async def upload_complete(
 ):
     """Validate completed upload in R2, save metadata doc in MongoDB, and return resource."""
     try:
+        if not storage.is_configured():
+            raise HTTPException(
+                status_code=503,
+                detail="File storage (Cloudflare R2) is not configured yet. Uploads will be enabled soon."
+            )
+
         # 1. Verify object exists in R2 and check size
         head = storage.head_object(req.key)
         if not head:
@@ -427,6 +439,12 @@ async def get_all_resources(
 async def get_download_url(resource_id: str):
     """Generate a presigned R2 GET URL for downloading a resource and increment download count."""
     try:
+        if not storage.is_configured():
+            raise HTTPException(
+                status_code=503,
+                detail="File storage (Cloudflare R2) is not configured yet. Downloads will be enabled soon."
+            )
+
         if not ObjectId.is_valid(resource_id):
             raise HTTPException(status_code=400, detail="Invalid resource ID format")
 
