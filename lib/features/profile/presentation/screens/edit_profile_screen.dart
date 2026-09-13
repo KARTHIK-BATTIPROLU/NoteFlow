@@ -211,7 +211,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       ),
     );
 
-    if (confirmed != true) return;
+    if (confirmed != true || !mounted) return;
 
     // Show password dialog for re-authentication
     final password = await showDialog<String>(

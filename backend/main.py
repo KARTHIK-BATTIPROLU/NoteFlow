@@ -15,6 +15,8 @@ from firebase_admin import credentials, auth
 from dotenv import load_dotenv
 load_dotenv()
 
+from pymongo import ReturnDocument
+
 from database import (
     connect_to_mongo,
     close_mongo_connection,
@@ -34,6 +36,7 @@ from models import (
     UploadInitResponse,
     UploadCompleteRequest,
     DownloadResponse,
+    LikeResponse,
 )
 import storage
 
@@ -433,6 +436,33 @@ async def get_all_resources(
     cursor = resources_collection().find(query).sort("created_at", -1).skip(skip).limit(limit)
     resources = await cursor.to_list(length=None)
     return await enrich_resources(resources)
+
+
+@app.get("/resources/{resource_id}", response_model=ResourceResponse)
+async def get_resource_by_id(resource_id: str):
+    """Get single resource by ObjectId."""
+    if not ObjectId.is_valid(resource_id):
+        raise HTTPException(status_code=400, detail="Invalid resource ID format")
+    doc = await resources_collection().find_one({"_id": ObjectId(resource_id), "status": "published"})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Resource not found")
+    enriched = await enrich_resources([doc])
+    return enriched[0]
+
+
+@app.post("/resources/{resource_id}/like", response_model=LikeResponse)
+async def like_resource(resource_id: str):
+    """Atomically increment like count for a resource."""
+    if not ObjectId.is_valid(resource_id):
+        raise HTTPException(status_code=400, detail="Invalid resource ID format")
+    result = await resources_collection().find_one_and_update(
+        {"_id": ObjectId(resource_id), "status": "published"},
+        {"$inc": {"likes": 1}},
+        return_document=ReturnDocument.AFTER,
+    )
+    if not result:
+        raise HTTPException(status_code=404, detail="Resource not found")
+    return LikeResponse(resource_id=str(result["_id"]), likes=result.get("likes", 1))
 
 
 @app.get("/resources/{resource_id}/download", response_model=DownloadResponse)

@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -105,5 +105,71 @@ void main() {
       expect(capturedUri.queryParameters['q'], equals('machine learning'));
       expect(capturedUri.queryParameters['subject'], equals('subj_ai'));
     });
+
+    test('getDownloadUrl returns presigned URL', () async {
+      final mockClient = MockClient((request) async {
+        if (request.url.path == '/resources/res123/download') {
+          return http.Response(
+            jsonEncode({'download_url': 'https://r2.cloudflarestorage.com/test.pdf'}),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        return http.Response('Not Found', 404);
+      });
+
+      final apiService = ApiService(client: mockClient, baseUrl: 'http://localhost:8000');
+      final url = await apiService.getDownloadUrl('res123');
+      expect(url, equals('https://r2.cloudflarestorage.com/test.pdf'));
+    });
+
+    test('likeResource increments likes count', () async {
+      final mockClient = MockClient((request) async {
+        if (request.url.path == '/resources/res123/like' && request.method == 'POST') {
+          return http.Response(
+            jsonEncode({'resource_id': 'res123', 'likes': 5}),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        return http.Response('Not Found', 404);
+      });
+
+      final apiService = ApiService(client: mockClient, baseUrl: 'http://localhost:8000');
+      final likes = await apiService.likeResource('res123');
+      expect(likes, equals(5));
+    });
+
+    test('getResource returns single resource', () async {
+      final mockClient = MockClient((request) async {
+        if (request.url.path == '/resources/res123') {
+          return http.Response(
+            jsonEncode({
+              'id': 'res123',
+              'title': 'Shared Discrete Math Notes',
+              'subject': 'subj1',
+              'topic': 'top1',
+              'firebase_uid': 'uid99',
+              'file_name': 'discrete.pdf',
+              'content_type': 'application/pdf',
+              'size': 2048,
+              'likes': 12,
+              'downloads': 34,
+              'created_at': DateTime.now().toIso8601String(),
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        return http.Response('Not Found', 404);
+      });
+
+      final apiService = ApiService(client: mockClient, baseUrl: 'http://localhost:8000');
+      final resource = await apiService.getResource('res123');
+      expect(resource.id, equals('res123'));
+      expect(resource.title, equals('Shared Discrete Math Notes'));
+      expect(resource.likes, equals(12));
+    });
   });
 }
+

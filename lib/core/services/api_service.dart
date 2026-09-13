@@ -262,13 +262,39 @@ class ApiService {
     }
   }
 
-  // Download file via presigned GET URL from R2
-  Future<String> downloadFile(
-    String resourceId, {
-    void Function(double progress)? onProgress,
-  }) async {
+  // Fetch single resource metadata
+  Future<Resource> getResource(String resourceId) async {
     try {
-      // Step 1: Get presigned download URL from backend
+      final uri = Uri.parse('$baseUrl/resources/$resourceId');
+      final response = await _client.get(uri);
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return Resource.fromJson(data);
+      }
+      throw Exception('Failed to get resource: HTTP ${response.statusCode}');
+    } catch (e) {
+      throw Exception('Failed to get resource: $e');
+    }
+  }
+
+  // Atomically increment like count on resource
+  Future<int> likeResource(String resourceId) async {
+    try {
+      final uri = Uri.parse('$baseUrl/resources/$resourceId/like');
+      final response = await _client.post(uri);
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['likes'] as int? ?? 1;
+      }
+      throw Exception('Failed to like resource: HTTP ${response.statusCode}');
+    } catch (e) {
+      throw Exception('Failed to like resource: $e');
+    }
+  }
+
+  // Get presigned download URL from backend
+  Future<String> getDownloadUrl(String resourceId) async {
+    try {
       final downloadInfoUri = Uri.parse('$baseUrl/resources/$resourceId/download');
       final infoResponse = await _client.get(downloadInfoUri);
 
@@ -277,7 +303,46 @@ class ApiService {
       }
 
       final infoData = jsonDecode(infoResponse.body);
-      final downloadUrl = infoData['download_url'] as String;
+      return infoData['download_url'] as String;
+    } catch (e) {
+      throw Exception('Failed to get download URL: $e');
+    }
+  }
+
+  // Download raw file bytes into memory (safe for Web, Android, iOS, Desktop)
+  Future<Uint8List> downloadFileBytes(
+    String resourceId, {
+    void Function(double progress)? onProgress,
+  }) async {
+    try {
+      final downloadUrl = await getDownloadUrl(resourceId);
+      if (onProgress != null) onProgress(0.3);
+
+      final fileResponse = await _client.get(Uri.parse(downloadUrl));
+      if (fileResponse.statusCode != 200) {
+        throw Exception('Storage download failed: HTTP ${fileResponse.statusCode}');
+      }
+      if (onProgress != null) onProgress(1.0);
+      return fileResponse.bodyBytes;
+    } catch (e) {
+      throw Exception('Download error: $e');
+    }
+  }
+
+  // Download file via presigned GET URL from R2
+  Future<String> downloadFile(
+    String resourceId, {
+    void Function(double progress)? onProgress,
+  }) async {
+    try {
+      // Step 1: Get presigned download URL from backend
+      final downloadUrl = await getDownloadUrl(resourceId);
+
+      // On Web, return direct presigned URL to avoid dart:io filesystem operations
+      if (kIsWeb) {
+        if (onProgress != null) onProgress(1.0);
+        return downloadUrl;
+      }
 
       // Step 2: Download file directly from presigned R2 URL
       final fileResponse = await _client.get(Uri.parse(downloadUrl));
@@ -293,7 +358,7 @@ class ApiService {
       }
 
       Directory tempDir;
-      if (!kIsWeb && Platform.environment['TEMP'] != null) {
+      if (Platform.environment['TEMP'] != null) {
         tempDir = Directory(Platform.environment['TEMP']!);
       } else {
         tempDir = await getTemporaryDirectory();

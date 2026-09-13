@@ -123,5 +123,15 @@ class TestNoteFlowApiIntegration(unittest.TestCase):
         self.assertEqual(resp.status_code, 400)
         self.assertIn("Invalid resource ID format", resp.json()["detail"])
 
+    def test_09_invalid_get_resource_id(self):
+        resp = self.client.get("/resources/invalid-object-id")
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("Invalid resource ID format", resp.json()["detail"])
+
+    def test_10_invalid_like_resource_id(self):
+        resp = self.client.post("/resources/invalid-object-id/like")
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("Invalid resource ID format", resp.json()["detail"])
+
 if __name__ == "__main__":
     unittest.main()

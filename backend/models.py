@@ -72,6 +72,11 @@ class DownloadResponse(BaseModel):
     download_url: str
 
 
+class LikeResponse(BaseModel):
+    resource_id: str
+    likes: int
+
+
 class UserDoc(BaseModel):
     firebase_uid: str
     handle: str

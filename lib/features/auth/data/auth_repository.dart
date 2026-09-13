@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
@@ -50,7 +51,7 @@ class AuthRepository {
       if (user == null) return null;
       return await user.getIdToken();
     } catch (e) {
-      print('Error getting ID token: $e');
+      debugPrint('Error getting ID token: $e');
       return null;
     }
   }
